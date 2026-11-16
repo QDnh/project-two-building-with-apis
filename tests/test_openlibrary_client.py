@@ -235,3 +235,37 @@ def test_network_failures_keep_the_technical_cause_for_logging(fake_get):
 )
 def test_clean_query(typed, cleaned):
     assert openlibrary.clean_query(typed) == cleaned
+
+
+# --- Looking one work up by ID ----------------------------------------------
+
+
+def test_fetch_work_searches_by_key_for_one_result(fake_get):
+    calls = fake_get(FakeResponse(json_data={"numFound": 1, "docs": [DUNE]}))
+
+    result = openlibrary.fetch_work("OL893414W")
+
+    params = calls[0]["params"]
+    assert params["q"] == "key:/works/OL893414W"
+    assert params["limit"] == 1
+    assert params["fields"] == openlibrary.FIELDS
+    assert result.work_id == "OL893414W"
+    assert result.title == "Dune"
+    assert len(result.isbns) == 10
+
+
+@pytest.mark.parametrize(
+    "docs", [[], [{**DUNE, "key": "/works/OL1W"}]], ids=["no match", "other work"]
+)
+def test_fetch_work_raises_when_open_library_has_no_such_work(fake_get, docs):
+    fake_get(FakeResponse(json_data={"numFound": len(docs), "docs": docs}))
+
+    with pytest.raises(openlibrary.SearchError, match="no book with that ID"):
+        openlibrary.fetch_work("OL893414W")
+
+
+def test_fetch_work_passes_on_search_failures(fake_get):
+    fake_get(FakeResponse(status_code=503))
+
+    with pytest.raises(openlibrary.SearchError, match="HTTP 503"):
+        openlibrary.fetch_work("OL893414W")

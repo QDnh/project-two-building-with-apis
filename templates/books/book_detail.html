@@ -17,6 +17,14 @@
         {% endif %}
       </div>
 
+      <div class="max-w-xs" data-testid="save-prompt">
+        {% if user.is_authenticated %}
+          {% include "books/_save_control.html" with work_id=book.work_id is_saved=own_save label="Save to my library" source="book_page" %}
+        {% else %}
+          <a href="{% url 'login' %}?next={{ request.path|urlencode }}" class="btn btn-sm btn-outline" data-testid="sign-in-to-save">Sign in to save</a>
+        {% endif %}
+      </div>
+
       <div data-testid="community-rating">
         <h2 class="text-sm font-semibold text-base-content/70">Community average</h2>
         {% if community_rating.count %}

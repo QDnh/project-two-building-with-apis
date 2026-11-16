@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from books import openlibrary
+from books.models import Book, SavedBook
 from books.openlibrary import SearchError, SearchPage, SearchResult
 
 pytestmark = pytest.mark.django_db
@@ -306,3 +307,49 @@ def test_page_past_the_last_result_links_back_to_the_first(signed_in, fake_searc
     assert 'data-testid="past-last-page"' in html
     assert f'href="{URL}?q=dune&amp;page=1"' in html
     assert "No books found matching" not in html
+
+
+# --- Save buttons (Phase 5) -------------------------------------------------
+
+
+def test_unsaved_results_show_a_save_button_that_posts_through_htmx(
+    signed_in, fake_search
+):
+    fake_search(SearchPage(total=1, results=[DUNE]))
+
+    html = get_html(signed_in, q="dune")
+
+    save_url = reverse("books:save_book", args=["OL893414W"])
+    assert 'data-testid="save-button"' in html
+    assert f'hx-post="{save_url}"' in html
+    assert f'action="{save_url}"' in html
+    assert 'data-testid="saved-link"' not in html
+
+
+def test_results_the_user_already_saved_show_saved_link(signed_in, fake_search):
+    user = User.objects.get(username="reader")
+    other = User.objects.create_user(
+        username="friend", email="friend@example.com", password="x"
+    )
+    dune = Book.objects.create(work_id="OL893414W", title="Dune")
+    mystery = Book.objects.create(work_id="OL1W", title="Mystery Book")
+    SavedBook.objects.create(user=user, book=dune)
+    SavedBook.objects.create(user=other, book=mystery)  # someone else's save
+    fake_search(SearchPage(total=2, results=[DUNE, NO_COVER]))
+
+    html = get_html(signed_in, q="dune")
+
+    assert html.count('data-testid="saved-link"') == 1
+    assert f'href="{reverse("books:book_detail", args=["OL893414W"])}"' in html
+    assert html.count('data-testid="save-button"') == 1
+    assert f'hx-post="{reverse("books:save_book", args=["OL1W"])}"' in html
+
+
+def test_save_buttons_return_to_the_current_search_without_javascript(
+    signed_in, fake_search
+):
+    fake_search(many_results(1000))
+
+    html = get_html(signed_in, q="dune", page="2")
+
+    assert f'name="next" value="{URL}?q=dune&amp;page=2"' in html

@@ -170,3 +170,19 @@ def search_books(query, *, page=1, limit=RESULTS_PER_PAGE, contact_email=None):
     if not isinstance(total, int):
         total = len(results)
     return SearchPage(total=total, results=results)
+
+
+def fetch_work(work_id, *, contact_email=None):
+    """Look one work up by its short ID (e.g. "OL893414W") through the search
+    endpoint and return its SearchResult.
+
+    Raises SearchError with a user-friendly message on any failure, including
+    when Open Library has no work with that ID.
+    """
+    page = search_books(
+        f"key:/works/{work_id}", page=1, limit=1, contact_email=contact_email
+    )
+    for result in page.results:
+        if result.work_id == work_id:
+            return result
+    raise SearchError("Open Library has no book with that ID.")

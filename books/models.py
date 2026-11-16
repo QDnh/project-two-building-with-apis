@@ -17,6 +17,9 @@ AUTHOR_SEPARATOR = "; "
 
 COVER_URL = "https://covers.openlibrary.org/b/id/{cover_id}-{size}.jpg"
 
+# A short-form Open Library work ID, e.g. OL893414W.
+WORK_ID_PATTERN = r"^OL\d+W$"
+
 
 class CommunityRating(NamedTuple):
     """The anonymous average of every rating a book has, and how many there are."""
@@ -33,7 +36,7 @@ class Book(models.Model):
         max_length=20,
         unique=True,
         validators=[
-            RegexValidator(r"^OL\d+W$", "Enter a work ID like OL893414W."),
+            RegexValidator(WORK_ID_PATTERN, "Enter a work ID like OL893414W."),
         ],
         help_text="Short form, e.g. OL893414W. Used in the book page URL.",
     )

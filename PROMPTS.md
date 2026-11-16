@@ -28,6 +28,25 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 5: Save by work ID
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 5`
+2. (Answer to "run the /tdd skill?") Yes, use TDD (Recommended)
+3. Yes, those look good. For these, just blitz through them. Make sure they go red, then make them green, and give me the details. Pause after each of the three.
+4. Move to 2.
+5. Move to 3.
+6. Finish Phase 5.
+7. One UI thing. The Save and Save to my library button text is offset to the right. The Saved text doesn't appear to be offset.
+8. Looks better. Another thing I noticed, is that on the books page after saving, the save button can be clicked again. Which sends me to the same page I'm already on.
+9. Fixed
+10. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 5. A new `books/services.py` has the one shared `save_book(user, work_id)` used by the website (and, later, the API). It rejects malformed work IDs before any request, raises `AlreadySaved` for duplicates (including a simultaneous double save), reuses a local `Book` with no Open Library call, and otherwise fetches the work with a new `openlibrary.fetch_work()` (a `key:/works/<id>` search with `limit=1`), stores it, and creates a private, Want to read, unrated save. Book details never come from the request. `SaveBookView` (POST `/books/<work_id>/save/`, signed in only) returns the `_save_control.html` partial over HTMX: "Saved ✓", "already in your Saved Books", or the Save button with an inline alert that links to Saved Books (the error is logged). Without JavaScript it redirects to a safe `next` URL with a flash message, so `base.html` gained a messages area. Search results show a Save button or "Saved ✓" linking to the book page. The book page shows "✓ In your Saved Books" to owners, "Save to my library" to signed-in non-owners and "Sign in to save" to visitors. The three TDD behaviours were: saving a local book while Open Library is down, fetching and storing a new book with safe defaults, and the view's alert next to the button. 154 tests pass; `ruff check` and `ruff format --check` are clean; no new migration.
+- **Deviations:** The user accepted the TDD recommendation and the three proposed behaviours, but asked to skip the approval stop at each RED and pause only after each GREEN. Two UI fixes came from the user's manual testing (below). No follow-up questions.
+- **Sideways:** Behaviour 2's first RED was an exception (`Book.DoesNotExist`), not an assertion, so the stub was changed to return `None` on a miss before the real RED. An edit to `SaveBookView`'s docstring left an extra `"""`, causing a syntax error that the next test run caught. The user found that the Save button text sat off-centre because htmx's indicator class only made the spinner transparent; it now uses `hidden in-[.htmx-request]:inline-block`, and the button is disabled while saving. The user also found that saving on the book page swapped in a "Saved ✓" link back to that same page; on the book page the control now shows "In your Saved Books" with a link to Saved Books, the owner state reuses the same partial, and a regression test was added.
+
 ## 2026-11-16 — Implemented Phase 4: Search paging over HTMX
 
 ### Prompts

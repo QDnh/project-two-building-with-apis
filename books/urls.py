@@ -8,4 +8,5 @@ urlpatterns = [
     path("catalog/", views.SearchCatalogView.as_view(), name="search_catalog"),
     path("saved/", views.SavedBooksView.as_view(), name="saved_books"),
     path("books/<str:work_id>/", views.BookDetailView.as_view(), name="book_detail"),
+    path("books/<str:work_id>/save/", views.SaveBookView.as_view(), name="save_book"),
 ]

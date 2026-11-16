@@ -24,6 +24,13 @@
             <p class="text-xs text-base-content/70">
               {{ book.author_list|join:", "|default:"Unknown author" }} · {{ book.first_publish_year|default:"Year unknown" }}
             </p>
+            <div class="mt-auto pt-2">
+              {% if book.work_id in saved_work_ids %}
+                {% include "books/_save_control.html" with work_id=book.work_id is_saved=True %}
+              {% else %}
+                {% include "books/_save_control.html" with work_id=book.work_id is_saved=False %}
+              {% endif %}
+            </div>
           </div>
         </div>
       {% endfor %}

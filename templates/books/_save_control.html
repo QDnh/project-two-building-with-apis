@@ -1,0 +1,48 @@
+{% comment %}
+One book's save control: a Save button, or "Saved ✓" linking to the book page.
+A failed save shows an alert right below the button, which stays to retry.
+
+Include with:
+  work_id   the book's Open Library work ID
+  is_saved   whether the signed-in user already has it in Saved Books
+  label   button text (default "Save")
+  source   "book_page" when included on the book page: keeps that label after
+           an HTMX save, and shows "In your Saved Books" instead of a
+           "Saved ✓" link back to the same page
+  next   where a no-JavaScript save redirects (default: the current page)
+  save_error, already_saved   set by the save view
+{% endcomment %}
+<div class="flex flex-col gap-2" data-testid="save-control">
+  {% if is_saved and source == "book_page" %}
+    {# Already on the book page, so point to Saved Books instead of back here. #}
+    <p class="badge badge-success badge-soft" data-testid="in-saved-books">✓ In your Saved Books</p>
+    <p class="text-sm"><a href="{% url 'books:saved_books' %}" class="link">Go to Saved Books</a></p>
+  {% elif is_saved %}
+    <a href="{% url 'books:book_detail' work_id %}" class="btn btn-sm btn-success btn-soft w-full" data-testid="saved-link">Saved ✓</a>
+    {% if already_saved %}
+      <p class="text-xs text-base-content/70" data-testid="already-saved">This book is already in your <a href="{% url 'books:saved_books' %}" class="link">Saved Books</a>.</p>
+    {% endif %}
+  {% else %}
+    <form method="post" action="{% url 'books:save_book' work_id %}"
+          hx-post="{% url 'books:save_book' work_id %}"
+          hx-target="closest [data-testid='save-control']" hx-swap="outerHTML"
+          hx-disabled-elt="find button">
+      {% csrf_token %}
+      {% if source %}<input type="hidden" name="source" value="{{ source }}">{% endif %}
+      <input type="hidden" name="next" value="{{ next|default:request.get_full_path }}">
+      <button type="submit" class="btn btn-sm btn-primary w-full" data-testid="save-button">
+        {# Takes no space until the form is sending, so the label stays centred. #}
+        <span class="loading loading-spinner loading-xs hidden in-[.htmx-request]:inline-block" aria-hidden="true"></span>
+        {{ label|default:"Save" }}
+      </button>
+    </form>
+    {% if save_error %}
+      <div role="alert" class="alert alert-error alert-soft items-start text-xs p-2" data-testid="save-error">
+        <div>
+          <p class="font-semibold">{{ save_error }}</p>
+          <p>Your saved books are still available: <a href="{% url 'books:saved_books' %}" class="link">go to Saved Books</a>.</p>
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>

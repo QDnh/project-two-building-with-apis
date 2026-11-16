@@ -1,13 +1,22 @@
 import logging
 from urllib.parse import urlencode
 
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import Http404
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views import View
 from django.views.generic import DetailView, TemplateView
 
-from . import openlibrary
-from .models import Book
+from . import openlibrary, services
+from .models import Book, SavedBook
 
 logger = logging.getLogger(__name__)
+
+# Save button text by where the button is shown; anywhere else uses "Save".
+SAVE_LABELS = {"book_page": "Save to my library"}
 
 
 def parse_page(value):
@@ -87,8 +96,15 @@ class SearchCatalogView(LoginRequiredMixin, TemplateView):
         params = {"q": context["query"]}
         path = self.request.path
         first = (page - 1) * per_page + 1
+        result_ids = [result.work_id for result in search_page.results]
         context.update(
             search_page=search_page,
+            # Results the user already has show "Saved ✓" instead of Save.
+            saved_work_ids=set(
+                SavedBook.objects.filter(
+                    user=self.request.user, book__work_id__in=result_ids
+                ).values_list("book__work_id", flat=True)
+            ),
             page=page,
             num_pages=num_pages,
             first_index=first,
@@ -102,6 +118,69 @@ class SearchCatalogView(LoginRequiredMixin, TemplateView):
             or (page == self.MAX_PAGES and total_pages > self.MAX_PAGES),
         )
         return context
+
+
+class SaveBookView(LoginRequiredMixin, View):
+    """Save a book to the user's Saved Books by its work ID.
+
+    Only the work ID is taken from the request; book details come from the
+    database or Open Library through the shared save function. If Open Library
+    fails, the alert appears next to the book's Save button and the technical
+    error is logged here.
+
+    HTMX requests get the save control back ("Saved ✓", "already saved", or
+    the Save button with an alert). Without JavaScript the form posts normally
+    and the user is redirected back to the page they came from, with a message.
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request, work_id):
+        source = request.POST.get("source", "")
+        context = {
+            "work_id": work_id,
+            "is_saved": False,
+            "source": source,
+            "label": SAVE_LABELS.get(source, "Save"),
+            "next": self.get_next_url(work_id),
+        }
+        try:
+            services.save_book(request.user, work_id)
+        except services.InvalidWorkId:
+            raise Http404("Not a valid Open Library work ID.") from None
+        except services.AlreadySaved as error:
+            context.update(is_saved=True, already_saved=True)
+            message_level, message = messages.INFO, str(error)
+        except openlibrary.SearchError as error:
+            logger.warning(
+                "Saving %s failed: %s",
+                work_id,
+                error,
+                exc_info=error.__cause__ is not None,
+            )
+            context["save_error"] = str(error)
+            message_level = messages.ERROR
+            message = f"{error} Your saved books are still available."
+        else:
+            context["is_saved"] = True
+            message_level, message = messages.SUCCESS, "Saved to your Saved Books."
+
+        if request.htmx:
+            return render(request, "books/_save_control.html", context)
+        messages.add_message(request, message_level, message)
+        return redirect(context["next"])
+
+    def get_next_url(self, work_id):
+        """Where a no-JavaScript save returns to: the posted `next` if it's a
+        page on this site, otherwise Search Catalog."""
+        next_url = self.request.POST.get("next", "")
+        if url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return next_url
+        return reverse("books:search_catalog")
 
 
 class SavedBooksView(LoginRequiredMixin, TemplateView):
@@ -126,4 +205,11 @@ class BookDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["community_rating"] = self.object.community_rating()
+        # Only the viewer's own save is ever looked up, never anyone else's.
+        user = self.request.user
+        context["own_save"] = (
+            self.object.saves.filter(user=user).first()
+            if user.is_authenticated
+            else None
+        )
         return context

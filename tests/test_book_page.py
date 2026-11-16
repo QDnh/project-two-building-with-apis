@@ -129,3 +129,41 @@ def test_book_without_a_cover_shows_the_placeholder(client, book):
     assert "covers.openlibrary.org" not in html
     # Shown straight away: no `hidden` attribute.
     assert re.search(r'data-testid="cover-placeholder"\s*>', html)
+
+
+# --- Save prompts (Phase 5) -------------------------------------------------
+
+
+def test_visitor_sees_sign_in_to_save(client, book):
+    html = page_html(client, book)
+
+    assert 'data-testid="sign-in-to-save"' in html
+    assert f'href="{reverse("login")}?next=/books/OL893414W/"' in html
+    assert 'data-testid="save-button"' not in html
+
+
+def test_signed_in_non_owner_sees_save_to_my_library(client, book):
+    save_with_rating(book, "friend", 5, is_public=True)  # someone else's save
+    reader = User.objects.create_user(
+        username="reader", email="reader@example.com", password="x"
+    )
+    client.force_login(reader)
+
+    html = page_html(client, book)
+
+    assert "Save to my library" in html
+    assert f'hx-post="{reverse("books:save_book", args=[book.work_id])}"' in html
+    assert 'name="source" value="book_page"' in html
+    assert 'data-testid="in-saved-books"' not in html
+    assert 'data-testid="sign-in-to-save"' not in html
+
+
+def test_owner_sees_the_book_is_in_their_saved_books(client, book):
+    owner = save_with_rating(book, "owner", None, is_public=False).user
+    client.force_login(owner)
+
+    html = page_html(client, book)
+
+    assert 'data-testid="in-saved-books"' in html
+    assert 'data-testid="save-button"' not in html
+    assert 'data-testid="sign-in-to-save"' not in html
