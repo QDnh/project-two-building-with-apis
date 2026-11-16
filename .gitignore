@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Git Bash / Cygwin crash dumps (e.g. bash.exe.stackdump)
+*.stackdump
