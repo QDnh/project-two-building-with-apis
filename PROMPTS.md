@@ -28,6 +28,20 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 11: Prune command and README
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 11`
+2. (Answer to "run the /tdd skill?") Skip TDD (Recommended)
+3. So, the dry run said 20 books. The command said deleted 20 books.
+4. It looks like it works.
+5. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit as "Implement Phase 11" and push.
+
+### Summary
+- **Outcome:** Built Phase 11. The new `books/management/commands/prune_books.py` deletes books with zero saves inside a transaction. With `--dry-run` it lists them (work ID and title) and deletes nothing, and when there's nothing to remove it says so. `PROTECT` on SavedBook's link to Book still stops a saved book being deleted. `tests/test_prune_books.py` adds 5 tests: the dry run deletes nothing; a real run deletes only unsaved books and keeps both public and private saves; pruned books return 404 on the book page and the book API endpoint; removing a book's last save makes it prunable; and an empty run says so. `README.md` replaced the one-line placeholder. It covers features, setup (uv, `.env`, Tailwind), environment variables, demo logins (password `shelf-demo-2026`), management commands, API endpoints and error codes, the privacy rules with the accepted single-rating edge case (*The Great Gatsby*, rated only by ben's private save), development commands, known limitations, and links to the project documents. 294 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the recommendation to skip TDD. During manual verification they asked why the dry run and the real run both reported 20 books when the instructions expected only *Moby Dick*. Checking the dev database showed that every remaining book (14) has a save and all 19 demo saves were intact. The other 19 pruned books were leftovers from earlier manual testing, saved and later unsaved, which `seed_demo` doesn't clean up. The user confirmed it works.
+- **Sideways:** The manual-verification steps wrongly assumed a freshly seeded database, so they predicted 1 pruned book instead of 20. The first test run failed with `NoReverseMatch` because the website URLs are namespaced (`books:book_detail`); the test was fixed. `ruff format` reformatted one line of the new command.
+
 ## 2026-11-16 — Implemented Phase 10: The app's API
 
 ### Prompts
