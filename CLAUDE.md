@@ -15,7 +15,7 @@ A Django web app and REST API where users search Open Library, save books to a p
 - Database: `uv run python manage.py migrate`
 - Dev server with live CSS rebuild: `uv run python manage.py tailwind runserver`
 - Build CSS once: `uv run python manage.py tailwind build` (output `assets/css/tailwind.css` is git-ignored)
-- Tests: `uv run pytest`
+- Tests: `uv run pytest` (the full suite takes about 3 minutes, longer than the default 2-minute command timeout). While working, run only the relevant files (`uv run pytest tests/test_<area>.py`); run the full suite only when it's needed, such as once at the end of a phase before committing.
 - Lint and format: `uv run ruff check .` and `uv run ruff format --check .`
 - Demo data (DEBUG only, no network): `uv run python manage.py seed_demo`
 
@@ -36,6 +36,7 @@ A Django web app and REST API where users search Open Library, save books to a p
 - Book details come only from Open Library, never from data sent by clients.
 - The website and the API share the same logic and enforce the same privacy rules, defined in one place.
 - Shared website/API logic lives in `books/services.py`; saving a book goes only through `services.save_book(user, work_id)`, and editing a save only through `services.update_saved_book(save, data)` (validates every field before saving anything; raises `InvalidUpdate`).
+- The privacy rule is `SavedBook.objects.public()`: anything that lists saves to someone other than their owner (profiles, public API endpoints) uses it and nothing else. Owner-only views look saves up with `user=request.user`, so another user's save is a 404.
 - Open Library is the only external API.
 - All Open Library calls go through `books/openlibrary.py`; it raises `SearchError` with a user-facing message. Client tests fake `requests.get`; view and API tests fake the client's functions.
 - Tests must never call the real Open Library.
