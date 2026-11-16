@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<div class="hero bg-base-100 rounded-box shadow-sm py-12">
+  <div class="hero-content text-center">
+    <div class="max-w-md">
+      <h1 class="text-3xl font-bold">Your personal reading list</h1>
+      <p class="py-4">Find books on Open Library, save them, rate them, and choose which ones to share with friends.</p>
+      {% if user.is_authenticated %}
+        <a href="{% url 'books:saved_books' %}" class="btn btn-primary">Go to Saved Books</a>
+      {% else %}
+        <a href="{% url 'signup' %}" class="btn btn-primary">Create an account</a>
+        <a href="{% url 'login' %}" class="btn btn-ghost">Sign in</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

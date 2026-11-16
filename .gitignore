@@ -221,3 +221,6 @@ __marimo__/
 
 # Git Bash / Cygwin crash dumps (e.g. bash.exe.stackdump)
 *.stackdump
+
+# Tailwind build output (rebuild with `python manage.py tailwind build`)
+assets/css/tailwind.css

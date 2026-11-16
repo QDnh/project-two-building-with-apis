@@ -78,8 +78,7 @@ def search_books(query, contact_email=None):
         data = response.json()
     except ValueError:
         raise SearchError(
-            "Open Library sent back a response that wasn't valid JSON. "
-            "Try again later."
+            "Open Library sent back a response that wasn't valid JSON. Try again later."
         ) from None
 
     if not isinstance(data, dict) or not isinstance(data.get("docs"), list):

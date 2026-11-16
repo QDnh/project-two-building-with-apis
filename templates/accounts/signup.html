@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sign up{% endblock %}
+{% block content %}
+<div class="card bg-base-100 shadow-sm max-w-md mx-auto">
+  <div class="card-body">
+    <h1 class="card-title text-2xl">Create an account</h1>
+    <p class="text-sm opacity-70">Your username is public: it's part of your profile link. Your email stays private.</p>
+    <form method="post" action="{% url 'signup' %}">
+      {% csrf_token %}
+      {% include "_form_fields.html" %}
+      <button type="submit" class="btn btn-primary w-full mt-4">Sign up</button>
+    </form>
+    <p class="text-sm mt-2">Already have an account? <a href="{% url 'login' %}" class="link link-primary">Sign in</a>.</p>
+  </div>
+</div>
+{% endblock %}

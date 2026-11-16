@@ -1,0 +1,40 @@
+{% load static tailwind_cli django_htmx %}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Book Catalog{% endblock %} · Book Catalog</title>
+  {% tailwind_css %}
+  {% htmx_script %}
+</head>
+<body class="min-h-screen bg-base-200" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <nav class="navbar bg-base-100 shadow-sm px-4">
+    <div class="flex-1">
+      <a href="{% url 'home' %}" class="text-lg font-bold">📚 Book Catalog</a>
+    </div>
+    {% if user.is_authenticated %}
+      <ul class="menu menu-horizontal px-1 hidden sm:flex">
+        <li><a href="{% url 'books:saved_books' %}" class="{% if request.resolver_match.view_name == 'books:saved_books' %}menu-active{% endif %}">Saved Books</a></li>
+      </ul>
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-ghost btn-sm" data-testid="user-menu">{{ user.username }} ▾</div>
+        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box w-max min-w-28 shadow z-10 mt-1">
+          <li class="sm:hidden"><a href="{% url 'books:saved_books' %}">Saved Books</a></li>
+          {# The button is the menu item itself, so the whole row is clickable. #}
+          <li><button type="submit" form="logout-form">Sign out</button></li>
+        </ul>
+      </div>
+      <form id="logout-form" method="post" action="{% url 'logout' %}" class="hidden">{% csrf_token %}</form>
+    {% else %}
+      <div class="flex gap-2">
+        <a href="{% url 'login' %}" class="btn btn-ghost btn-sm">Sign in</a>
+        <a href="{% url 'signup' %}" class="btn btn-primary btn-sm">Sign up</a>
+      </div>
+    {% endif %}
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -3,6 +3,9 @@ name = "book-catalog-system"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
+    "django>=6.1.3",
+    "django-htmx>=1.29.0",
+    "django-tailwind-cli>=4.8.2",
     "python-dotenv>=1.2.4",
     "requests>=2.34.2",
 ]
@@ -10,9 +13,28 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.2.0",
+    "pytest-django>=4.14.0",
+    "ruff>=0.17.5",
 ]
 
 [tool.pytest.ini_options]
-# Let tests `import openlibrary_search` from the scripts/ folder.
-pythonpath = ["scripts"]
+DJANGO_SETTINGS_MODULE = "config.settings"
+# "." lets tests import the Django project; "scripts" lets them
+# `import openlibrary_search` until it moves into the books app (Phase 3).
+pythonpath = [".", "scripts"]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+extend-exclude = ["*/migrations/*", "prototypes"]
+
+[tool.ruff.lint]
+# pycodestyle, Pyflakes, isort, bugbear, pyupgrade, Django-specific checks
+select = ["E", "F", "I", "B", "UP", "DJ"]
+
+[tool.ruff.lint.per-file-ignores]
+# Django's password-validator dotted paths are longer than one line.
+"config/settings.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["accounts", "books", "config", "openlibrary_search"]

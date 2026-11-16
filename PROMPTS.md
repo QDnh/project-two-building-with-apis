@@ -28,6 +28,20 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 1: project skeleton and accounts
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 1`
+2. (Answer to "run the /tdd skill?") Skip TDD (Recommended)
+3. One issue with UI. The "Sign out" button is only clickable on the left side. It might be too long as well.
+4. Looks and works better. Everything looks good.
+5. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 1. Django 6.1 project (`config`) with `accounts` and `books` apps; custom `accounts.User` with a required, database-unique email in the first migration; sign-up (duplicate emails rejected case-insensitively, Django's password validators), sign-in by username with one generic failure message, POST sign-out, and a members-only `/saved/` placeholder that redirects to sign-in. Base layout with a Shelf-grid navbar, Tailwind + DaisyUI built locally by django-tailwind-cli (CLI pinned to 2.10.34; built CSS git-ignored), and htmx 2.0.10 served from django-htmx's vendored static copy (pinned via `uv.lock`). Settings read `.env` (`DJANGO_SECRET_KEY`, `DJANGO_DEBUG` added to `.env.example`). pytest-django and Ruff configured; an autouse network guard in `tests/conftest.py` fails any test that opens a real connection, and has its own tests. 36 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the recommendation to skip TDD for this phase. Using django-htmx's bundled htmx instead of downloading a separate copy was the agent's call, explained in the wrap-up.
+- **Sideways:** The first settings draft guessed a Tailwind CLI version; the agent checked GitHub releases and pinned a real one before building. The admin "add user" form needed email (and Django's `usable_password` field) added because of the unique email. Ruff flagged import order and a long settings line, fixed with config. During manual testing the user found the Sign out menu item was only clickable on its left side (the button sat inside a padded `<form>`) and the dropdown was too wide; the agent made the button the menu item, moved the form outside the menu, and sized the menu to its content.
+
 ## 2026-11-16 — Broke the Book Catalog System PRD into an 11-phase implementation plan
 
 ### Prompts
