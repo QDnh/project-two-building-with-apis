@@ -37,6 +37,7 @@ A Django web app and REST API where users search Open Library, save books to a p
 - The website and the API share the same logic and enforce the same privacy rules, defined in one place.
 - Shared website/API logic lives in `books/services.py`; saving a book goes only through `services.save_book(user, work_id)`, and editing a save only through `services.update_saved_book(save, data)` (validates every field before saving anything; raises `InvalidUpdate`).
 - The privacy rule is `SavedBook.objects.public()`: anything that lists saves to someone other than their owner (profiles, public API endpoints) uses it and nothing else. Owner-only views look saves up with `user=request.user`, so another user's save is a 404.
+- The API (`books/api.py`, routes in `books/api_urls.py` under `/api/`) requires sign-in by default (token auth listed first, so anonymous calls get 401); public endpoints set `AllowAny` explicitly. Service errors map to HTTP the same way everywhere: `InvalidWorkId`/`AlreadySaved`/`InvalidUpdate` → 400, `SearchError` → 503.
 - Open Library is the only external API.
 - All Open Library calls go through `books/openlibrary.py`; it raises `SearchError` with a user-facing message. Client tests fake `requests.get`; view and API tests fake the client's functions.
 - Tests must never call the real Open Library.
