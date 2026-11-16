@@ -7,7 +7,25 @@ A Django web app and REST API where users search Open Library, save books to a p
 - Python 3.14, Django, Django REST Framework, SQLite
 - uv for dependencies; Ruff for linting and formatting; pytest with pytest-django
 - Tailwind CSS with DaisyUI via django-tailwind-cli
-- HTMX as a vendored, version-pinned static file (no CDN), with django-htmx
+- HTMX via django-htmx's vendored copy (`{% htmx_script %}`), pinned by `uv.lock`; no CDN
+
+## Commands
+
+- Install: `uv sync`
+- Database: `uv run python manage.py migrate`
+- Dev server with live CSS rebuild: `uv run python manage.py tailwind runserver`
+- Build CSS once: `uv run python manage.py tailwind build` (output `assets/css/tailwind.css` is git-ignored)
+- Tests: `uv run pytest`
+- Lint and format: `uv run ruff check .` and `uv run ruff format --check .`
+- Demo data (DEBUG only, no network): `uv run python manage.py seed_demo`
+
+## Conventions
+
+- Settings come from environment variables loaded from `.env`; document new ones in `.env.example`.
+- Templates live in the top-level `templates/` folder; `base.html` holds the navbar.
+- The site uses DaisyUI's dark theme (set in `base.html`); style with DaisyUI's theme colours (`bg-base-100`, `text-base-content`, …), not fixed colours.
+- Website views are class-based (Django generic views and mixins); the API uses DRF's class-based views and viewsets.
+- Tests live in the top-level `tests/` folder. An autouse fixture in `tests/conftest.py` fails any test that opens a real network connection.
 
 ## Architecture decisions
 
