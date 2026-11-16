@@ -6,6 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.cache import patch_vary_headers
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -162,10 +163,11 @@ class SaveBookView(LoginRequiredMixin, View):
             "next": self.get_next_url(work_id),
         }
         try:
-            services.save_book(request.user, work_id)
+            save = services.save_book(request.user, work_id)
         except services.InvalidWorkId:
             raise Http404("Not a valid Open Library work ID.") from None
         except services.AlreadySaved as error:
+            save = error.saved_book
             context.update(is_saved=True, already_saved=True)
             message_level, message = messages.INFO, str(error)
         except openlibrary.SearchError as error:
@@ -183,6 +185,9 @@ class SaveBookView(LoginRequiredMixin, View):
             message_level, message = messages.SUCCESS, "Saved to your Saved Books."
 
         if request.htmx:
+            if context["is_saved"] and source == "book_page":
+                # On the book page, the new owner gets their edit controls.
+                return render(request, "books/_owner_controls.html", {"save": save})
             return render(request, "books/_save_control.html", context)
         messages.add_message(request, message_level, message)
         return redirect(context["next"])
@@ -271,17 +276,20 @@ def safe_next_url(request, default):
 
 
 class UpdateSavedBookView(LoginRequiredMixin, View):
-    """Edit the signed-in user's own save from its Saved Books card.
+    """Edit the signed-in user's own save from its Saved Books card or the
+    book page (posted with source=book_page).
 
     Accepts any subset of status, rating (empty clears it) and is_public;
     `services.update_saved_book` validates them all before saving anything.
     Someone else's save is a 404, exactly like one that doesn't exist.
 
-    HTMX requests get only the updated card back, with "Saved ✓" or the
-    errors. The list isn't re-filtered: if the edited save no longer matches
-    the filters of the list it was edited on (the posted `next` URL), the card
-    stays with a hint until the filters or page change. Without JavaScript,
-    the user is redirected back to that list with a message.
+    HTMX requests get only the updated partial back, with "Saved ✓" or the
+    errors: the book page's owner controls (plus the refreshed community
+    average, swapped in out of band), or the card. A card's list isn't
+    re-filtered: if the edited save no longer matches the filters of the list
+    it was edited on (the posted `next` URL), the card stays with a hint until
+    the filters or page change. Without JavaScript, the user is redirected
+    back to the book page or that list, with a message.
     """
 
     http_method_names = ["post"]
@@ -290,8 +298,14 @@ class UpdateSavedBookView(LoginRequiredMixin, View):
         save = get_object_or_404(
             SavedBook.objects.select_related("book"), pk=pk, user=request.user
         )
-        list_url = safe_next_url(request, reverse("books:saved_books"))
-        context = {"save": save, "list_url": list_url}
+        from_book_page = request.POST.get("source") == "book_page"
+        if from_book_page:
+            template = "books/_owner_controls.html"
+            return_url = save.book.get_absolute_url()
+        else:
+            template = "books/_saved_book_card.html"
+            return_url = safe_next_url(request, reverse("books:saved_books"))
+        context = {"save": save, "list_url": return_url}
         try:
             services.update_saved_book(save, request.POST)
         except services.InvalidUpdate as error:
@@ -299,17 +313,47 @@ class UpdateSavedBookView(LoginRequiredMixin, View):
             message_level = messages.ERROR
             message = f"{error} Nothing was changed."
         else:
-            filters = QueryDict(urlsplit(list_url).query)
             context["just_saved"] = True
-            context["stale"] = not services.filter_saved_books(
-                SavedBook.objects.filter(pk=save.pk), filters
-            ).saves.exists()
+            if not from_book_page:
+                filters = QueryDict(urlsplit(return_url).query)
+                context["stale"] = not services.filter_saved_books(
+                    SavedBook.objects.filter(pk=save.pk), filters
+                ).saves.exists()
             message_level, message = messages.SUCCESS, f"Saved “{save.book.title}”."
 
         if request.htmx:
-            return render(request, "books/_saved_book_card.html", context)
+            response = render(request, template, context)
+            if from_book_page and context.get("just_saved"):
+                # A rating change moves the community average, which sits
+                # outside the owner controls: send it along out of band.
+                response.content += render_to_string(
+                    "books/_community_rating.html",
+                    {"community_rating": save.book.community_rating(), "oob": True},
+                    request,
+                ).encode()
+            return response
         messages.add_message(request, message_level, message)
-        return redirect(list_url)
+        return redirect(return_url)
+
+
+class RemoveSavedBookView(LoginRequiredMixin, View):
+    """Remove one of the signed-in user's saves from their Saved Books.
+
+    Deletes only that SavedBook; the shared Book row stays, so its page keeps
+    working (and offers "Save to my library" again). Someone else's save is a
+    404, exactly like one that doesn't exist. Redirects back to the book page.
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request, pk):
+        save = get_object_or_404(
+            SavedBook.objects.select_related("book"), pk=pk, user=request.user
+        )
+        book = save.book
+        save.delete()
+        messages.success(request, f"Removed “{book.title}” from your Saved Books.")
+        return redirect(book.get_absolute_url())
 
 
 class BookDetailView(DetailView):

@@ -1,0 +1,17 @@
+{% comment %}
+The book page's anonymous community average: one decimal plus the count, or
+"No ratings yet". Never shows who rated.
+
+Include with:
+  community_rating   from Book.community_rating()
+  oob   true when the update view sends it alongside the owner controls, so
+        HTMX swaps it into the page out of band and the average stays current
+{% endcomment %}
+<div id="community-rating" data-testid="community-rating"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <h2 class="text-sm font-semibold text-base-content/70">Community average</h2>
+  {% if community_rating.count %}
+    <p class="text-xl font-semibold">{{ community_rating.average }} ★ from {{ community_rating.count }} rating{{ community_rating.count|pluralize }}</p>
+  {% else %}
+    <p class="text-base-content/60">No ratings yet</p>
+  {% endif %}
+</div>

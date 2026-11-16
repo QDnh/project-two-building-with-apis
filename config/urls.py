@@ -2,7 +2,10 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import TemplateView
 
+from accounts.views import ProfileView
+
 urlpatterns = [
+    path("users/<str:username>/", ProfileView.as_view(), name="profile"),
     path("", TemplateView.as_view(template_name="home.html"), name="home"),
     path("accounts/", include("accounts.urls")),
     path("", include("books.urls")),

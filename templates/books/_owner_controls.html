@@ -1,0 +1,78 @@
+{% comment %}
+The book page's controls for a signed-in owner: the full edit form (status,
+rating, sharing) and Remove.
+
+Include with:
+  save   the signed-in user's SavedBook for this book
+After an edit, the update view also passes:
+  just_saved   show a brief "Saved ✓"
+  edit_errors  per-field messages when the edit was rejected
+
+The edit form posts to the shared update view with source=book_page, which
+returns this partial again for HTMX (swapping only these controls) and
+redirects back to the book page without JavaScript. The hidden
+is_public=false before the checkbox means an unticked toggle still sends
+"false". Remove is a normal post: it reloads the book page, which then offers
+"Save to my library".
+{% endcomment %}
+<div id="owner-controls" class="flex flex-col gap-3" data-testid="owner-controls">
+  <p class="badge badge-success badge-soft" data-testid="in-saved-books">✓ In your Saved Books</p>
+
+  <form method="post" action="{% url 'books:update_saved_book' save.pk %}" data-testid="owner-edit-form"
+        hx-post="{% url 'books:update_saved_book' save.pk %}" hx-target="#owner-controls" hx-swap="outerHTML"
+        hx-disabled-elt="find button[type='submit']" class="flex flex-col gap-3">
+    {% csrf_token %}
+    <input type="hidden" name="source" value="book_page">
+
+    <label class="flex flex-col gap-1">
+      <span class="text-sm font-semibold">Status</span>
+      <select name="status" class="select select-sm w-full" data-testid="status">
+        {% for value, label in save.Status.choices %}
+          <option value="{{ value }}" {% if save.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="flex flex-col gap-1">
+      <span class="text-sm font-semibold">My rating</span>
+      <select name="rating" class="select select-sm w-full" data-testid="rating">
+        <option value="" {% if not save.rating %}selected{% endif %}>Not rated</option>
+        {% for value in "54321" %}
+          <option value="{{ value }}" {% if save.rating|stringformat:"s" == value %}selected{% endif %}>{{ value }} star{{ value|pluralize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="flex items-center gap-2 text-sm cursor-pointer">
+      <input type="hidden" name="is_public" value="false">
+      <input type="checkbox" name="is_public" value="true" class="toggle toggle-sm toggle-primary"
+             {% if save.is_public %}checked{% endif %}>
+      <span>Public <span class="text-base-content/60">(shown on your profile)</span></span>
+    </label>
+
+    <div class="flex items-center gap-3">
+      <button type="submit" class="btn btn-sm btn-primary" data-testid="save-changes">
+        <span class="loading loading-spinner loading-xs hidden in-[.htmx-request]:inline-block" aria-hidden="true"></span>
+        Save changes
+      </button>
+      {% if just_saved %}
+        <span role="status" class="text-sm font-medium text-success opacity-0 transition-opacity duration-1000 delay-1000 [.htmx-added_&]:opacity-100" data-testid="saved-flash">Saved ✓</span>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if edit_errors %}
+    <div role="alert" class="alert alert-error alert-soft text-sm p-2" data-testid="edit-errors">
+      <span>{% for message in edit_errors.values %}{{ message }}{% if not forloop.last %} {% endif %}{% endfor %} Nothing was changed.</span>
+    </div>
+  {% endif %}
+
+  <div class="flex items-center justify-between gap-2">
+    <a href="{% url 'books:saved_books' %}" class="link text-sm">Go to Saved Books</a>
+    <form method="post" action="{% url 'books:remove_saved_book' save.pk %}"
+          onsubmit="return confirm('Remove this book from your Saved Books?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-error btn-outline" data-testid="remove">Remove</button>
+    </form>
+  </div>
+</div>

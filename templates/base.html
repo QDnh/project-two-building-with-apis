@@ -22,6 +22,7 @@
         <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box w-max min-w-28 shadow z-10 mt-1">
           <li class="sm:hidden"><a href="{% url 'books:search_catalog' %}">Search Catalog</a></li>
           <li class="sm:hidden"><a href="{% url 'books:saved_books' %}">Saved Books</a></li>
+          <li><a href="{% url 'profile' user.username %}" data-testid="profile-link">My profile</a></li>
           {# The button is the menu item itself, so the whole row is clickable. #}
           <li><button type="submit" form="logout-form">Sign out</button></li>
         </ul>

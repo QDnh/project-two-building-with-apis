@@ -7,17 +7,13 @@ Include with:
   is_saved   whether the signed-in user already has it in Saved Books
   label   button text (default "Save")
   source   "book_page" when included on the book page: keeps that label after
-           an HTMX save, and shows "In your Saved Books" instead of a
-           "Saved ✓" link back to the same page
+           a failed HTMX save; a successful one is answered with the owner
+           controls (_owner_controls.html) instead of this control
   next   where a no-JavaScript save redirects (default: the current page)
   save_error, already_saved   set by the save view
 {% endcomment %}
 <div class="flex flex-col gap-2" data-testid="save-control">
-  {% if is_saved and source == "book_page" %}
-    {# Already on the book page, so point to Saved Books instead of back here. #}
-    <p class="badge badge-success badge-soft" data-testid="in-saved-books">✓ In your Saved Books</p>
-    <p class="text-sm"><a href="{% url 'books:saved_books' %}" class="link">Go to Saved Books</a></p>
-  {% elif is_saved %}
+  {% if is_saved %}
     <a href="{% url 'books:book_detail' work_id %}" class="btn btn-sm btn-success btn-soft w-full" data-testid="saved-link">Saved ✓</a>
     {% if already_saved %}
       <p class="text-xs text-base-content/70" data-testid="already-saved">This book is already in your <a href="{% url 'books:saved_books' %}" class="link">Saved Books</a>.</p>

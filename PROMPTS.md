@@ -28,6 +28,25 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 9: Book page owner controls and public profile
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 9`
+2. (Answer to "run the /tdd skill?") Yes, run /tdd (Recommended)
+3. Seems right. Do it. Blitz through them. Check they are red, make them green, and pause after each to give me details.
+4. yes, go to cycle 2
+5. yes, go to cycle 3
+6. yes, carry on with the rest
+7. Most things work. So, is Save changes meant to reload the page?
+8. It was the average not updating, add the live-average fix.
+9. it works now, continue
+10. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 9. `SavedBook.objects.public()` (a new `SavedBookQuerySet`) is the one privacy rule, and the new `ProfileView` (`/users/<username>/`, in `accounts`) lists saves only through `filter(user=…).public()`. It shows public saves as read-only Shelf-grid cards with stars and a status badge, 12 per page with HTMX paging, a "has no public books yet" state, and a 404 for unknown usernames. The navbar user menu links to "My profile". The book page shows owners a new `_owner_controls.html` partial: status and rating dropdowns, a Public toggle, Save changes, and Remove. The edit form posts to the existing `UpdateSavedBookView` with `source=book_page`, which returns the owner-controls partial for HTMX or redirects to the book page without JavaScript. A new `RemoveSavedBookView` (`POST /saved/<pk>/remove/`) deletes only the owner's SavedBook and returns to the book page. An HTMX save from the book page now returns the owner controls directly, and the unreachable "In your Saved Books" branch of `_save_control.html` was removed. The three TDD behaviours were: the public-saves query returns only public saves, the profile never shows private saves even to the owner, and Remove deletes only the user's own save. New tests are in `tests/test_profiles.py` and `tests/test_book_page_owner.py`. 255 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the TDD recommendation and the three proposed behaviours without changes, and asked to go straight from red to green, pausing after each GREEN. During manual checks they asked whether Save changes is meant to reload the page; it wasn't reloading, but the community average stayed stale until a refresh. They chose the suggested fix: the community average moved into `_community_rating.html`, and a successful book-page edit over HTMX also sends it as an out-of-band swap (two more tests).
+- **Sideways:** In cycle 3's RED, the 404 for someone else's save already passed, because the scaffolding copied the update view's owner-scoped lookup; only the "save is deleted" assertion failed. The full suite takes about 2.5 minutes, which is longer than the default 2-minute command timeout, so the first run went to the background. A heredoc used to append the follow-up tests failed to parse because of an unmatched quote; nothing ran, and the tests were added with the Edit tool instead. Ruff flagged the `objects` manager declared above the model fields (DJ012), and `ruff format` fixed a missing space left by a URL edit.
+
 ## 2026-11-16 — Implemented Phase 8: Card quick edits
 
 ### Prompts

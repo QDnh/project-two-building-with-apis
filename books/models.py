@@ -95,6 +95,16 @@ class Book(models.Model):
         return CommunityRating(average=average, count=count)
 
 
+class SavedBookQuerySet(models.QuerySet):
+    def public(self):
+        """Saves their owners chose to share: the only saves anyone else may see.
+
+        This is the privacy rule. Every profile page and public API endpoint
+        lists saves through this method and nothing else.
+        """
+        return self.filter(is_public=True)
+
+
 class SavedBook(models.Model):
     """One user's save of a book, with their own status, rating and sharing."""
 
@@ -120,6 +130,8 @@ class SavedBook(models.Model):
     )
     is_public = models.BooleanField("public", default=False)
     saved_at = models.DateTimeField("date saved", auto_now_add=True)
+
+    objects = SavedBookQuerySet.as_manager()
 
     class Meta:
         ordering = ["-saved_at"]

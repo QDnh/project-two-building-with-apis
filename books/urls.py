@@ -12,6 +12,11 @@ urlpatterns = [
         views.UpdateSavedBookView.as_view(),
         name="update_saved_book",
     ),
+    path(
+        "saved/<int:pk>/remove/",
+        views.RemoveSavedBookView.as_view(),
+        name="remove_saved_book",
+    ),
     path("books/<str:work_id>/", views.BookDetailView.as_view(), name="book_detail"),
     path("books/<str:work_id>/save/", views.SaveBookView.as_view(), name="save_book"),
 ]
