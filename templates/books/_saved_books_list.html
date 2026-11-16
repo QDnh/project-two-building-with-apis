@@ -1,0 +1,20 @@
+{# The Saved Books list area: the card grid with pagination, or the empty state. #}
+{% if saves %}
+  <p class="text-sm text-base-content/70" data-testid="saves-summary">
+    {{ total_saves }} saved book{{ total_saves|pluralize }}
+  </p>
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
+    {% for save in saves %}
+      {% include "books/_saved_book_card.html" %}
+    {% endfor %}
+  </div>
+  {% include "_pagination.html" with target="#saved-books-list" %}
+{% else %}
+  <div class="card bg-base-100 shadow-sm border border-base-300" data-testid="no-saves">
+    <div class="card-body items-center text-center">
+      <span class="text-4xl" aria-hidden="true">📚</span>
+      <p>You don't have any saved books yet.</p>
+      <a href="{% url 'books:search_catalog' %}" class="btn btn-primary btn-sm">Search the catalog</a>
+    </div>
+  </div>
+{% endif %}

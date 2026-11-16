@@ -28,6 +28,22 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 6: Saved Books list
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 6`
+2. (Answer to "run the /tdd skill?") Skip TDD (Recommended)
+3. A few things. A Search the catalog button AND a Find books to save button are redundant. Two, when I clicked a book page then clicked back, it took me to an unformated saved page.
+4. Go ahead and add the convention. Additional question. Are the books on the catalog meant to be clickable yet?
+5. Okay, good to know. A different question. What happens if a saved books page has over 10 pages?
+6. Okay, good. Glad the logic checks out. Continue
+7. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 6. `SavedBooksView` (`/saved/`, signed in only) lists only the user's own saves, newest first, 12 per page, from the local database only. It uses `Paginator.get_page`, so invalid or out-of-range page numbers show a real page. The page uses the shared `_pagination.html`, and HTMX paging swaps only the new `_saved_books_list.html` partial. Each Shelf-grid card (`_saved_book_card.html`, kept separate for Phase 8's card swaps) shows the cover or placeholder, title linking to the book page, authors, year, rating as stars or "Not rated", a status badge and a Public/Private badge. Users with no saves see an empty state linking to Search Catalog. A new `tests/test_saved_books.py` fakes every Open Library client function to fail if called. 171 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the recommendation to skip TDD. After manual testing they asked for two fixes (below). They approved a suggested CLAUDE.md convention for `HtmxPartialMixin`. They also asked two follow-up questions: whether Search Catalog results should be clickable (no; only "Saved ✓" links, since book pages exist only for stored books, and full work records are out of scope) and what happens past 10 pages on Saved Books (nothing; the 10-page cap is only for Search Catalog because of Open Library's rate limits).
+- **Sideways:** The first version had both a header "Find books to save" button and an empty-state "Search the catalog" button; the header one was removed because the navbar already links to Search Catalog. The user found that going back from a book page after HTMX paging showed an unstyled page: the browser had cached the HTMX partial under the same URL. This also affected Search Catalog since Phase 4. A shared `HtmxPartialMixin` now picks the partial or full template for both views and sets `Vary: HX-Request`, with a regression test in both test files.
+
 ## 2026-11-16 — Implemented Phase 5: Save by work ID
 
 ### Prompts

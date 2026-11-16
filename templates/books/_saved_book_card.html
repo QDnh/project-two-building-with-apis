@@ -1,0 +1,40 @@
+{% comment %}
+One Saved Books card (Shelf grid): cover, title, authors, year, the user's
+rating and status, and whether the save is public.
+
+Include with:
+  save   the user's SavedBook (with its book)
+{% endcomment %}
+{% with book=save.book %}
+<div class="card bg-base-100 shadow-sm border border-base-300" data-testid="saved-book">
+  <a href="{{ book.get_absolute_url }}" class="block">
+    <figure class="aspect-[2/3] rounded-t-box overflow-hidden">
+      {% include "books/_cover.html" %}
+    </figure>
+  </a>
+  <div class="card-body p-3 gap-1">
+    <h2 class="font-semibold leading-tight">
+      <a href="{{ book.get_absolute_url }}" class="link link-hover">{{ book.title }}</a>
+    </h2>
+    <p class="text-xs text-base-content/70">
+      {{ book.author_list|join:", "|default:"Unknown author" }} · {{ book.first_publish_year|default:"Year unknown" }}
+    </p>
+    <p class="text-sm" data-testid="rating">
+      {% if save.rating %}
+        <span class="text-warning" aria-hidden="true">{% for i in "12345" %}{% if forloop.counter <= save.rating %}★{% else %}☆{% endif %}{% endfor %}</span>
+        <span class="sr-only">Rated {{ save.rating }} out of 5</span>
+      {% else %}
+        <span class="text-base-content/60">Not rated</span>
+      {% endif %}
+    </p>
+    <div class="flex flex-wrap gap-1 mt-auto pt-2">
+      <span class="badge badge-sm badge-primary badge-soft" data-testid="status">{{ save.get_status_display }}</span>
+      {% if save.is_public %}
+        <span class="badge badge-sm badge-success badge-soft" data-testid="visibility">Public</span>
+      {% else %}
+        <span class="badge badge-sm badge-ghost" data-testid="visibility">Private</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endwith %}

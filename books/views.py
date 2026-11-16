@@ -3,9 +3,11 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.cache import patch_vary_headers
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import DetailView, TemplateView
@@ -33,7 +35,30 @@ def page_url(path, params, page):
     return f"{path}?{urlencode({**params, 'page': page})}"
 
 
-class SearchCatalogView(LoginRequiredMixin, TemplateView):
+class HtmxPartialMixin:
+    """Render `partial_template_name` for HTMX requests, the full page otherwise.
+
+    A history restore (back button with no cached snapshot) gets the whole
+    page even though it arrives as an HTMX request. Every response varies on
+    the HX-Request header, so the browser caches the partial and the full page
+    separately and never shows a bare partial when you go back to the URL.
+    """
+
+    partial_template_name = None
+
+    def get_template_names(self):
+        htmx = self.request.htmx
+        if htmx and not htmx.history_restore_request:
+            return [self.partial_template_name]
+        return super().get_template_names()
+
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        patch_vary_headers(response, ["HX-Request"])
+        return response
+
+
+class SearchCatalogView(LoginRequiredMixin, HtmxPartialMixin, TemplateView):
     """Search Catalog: search Open Library and show one page of results.
 
     With no `q` in the URL the page shows just the search form. An empty `q`
@@ -50,14 +75,6 @@ class SearchCatalogView(LoginRequiredMixin, TemplateView):
     template_name = "books/search_catalog.html"
     partial_template_name = "books/_search_results.html"
     MAX_PAGES = 10
-
-    def get_template_names(self):
-        htmx = self.request.htmx
-        # A history restore (back button with no cached snapshot) needs the
-        # whole page, even though it arrives as an HTMX request.
-        if htmx and not htmx.history_restore_request:
-            return [self.partial_template_name]
-        return [self.template_name]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -183,10 +200,39 @@ class SaveBookView(LoginRequiredMixin, View):
         return reverse("books:search_catalog")
 
 
-class SavedBooksView(LoginRequiredMixin, TemplateView):
-    """The user's Saved Books. A members-only placeholder until Phase 6."""
+class SavedBooksView(LoginRequiredMixin, HtmxPartialMixin, TemplateView):
+    """Saved Books: the signed-in user's own saves, newest first.
+
+    Built only from the local database, so it keeps working when Open Library
+    is down. Shows PER_PAGE saves per page with the page number in the URL; an
+    invalid or out-of-range page shows the nearest real page instead of an
+    error. HTMX requests from the pagination buttons get only the list partial.
+    """
 
     template_name = "books/saved_books.html"
+    partial_template_name = "books/_saved_books_list.html"
+    PER_PAGE = 12
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        saves = (
+            SavedBook.objects.filter(user=self.request.user)
+            .select_related("book")
+            .order_by("-saved_at", "-pk")
+        )
+        paginator = Paginator(saves, self.PER_PAGE)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+        page = page_obj.number
+        path = self.request.path
+        context.update(
+            saves=page_obj.object_list,
+            total_saves=paginator.count,
+            page=page,
+            num_pages=paginator.num_pages,
+            prev_url=page_url(path, {}, page - 1) if page_obj.has_previous() else None,
+            next_url=page_url(path, {}, page + 1) if page_obj.has_next() else None,
+        )
+        return context
 
 
 class BookDetailView(DetailView):

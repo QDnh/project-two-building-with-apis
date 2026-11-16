@@ -211,6 +211,17 @@ def test_htmx_request_returns_only_the_results_partial(signed_in, fake_search):
     assert 'data-testid="user-menu"' not in html
 
 
+@pytest.mark.parametrize("headers", [{}, {"HTTP_HX_REQUEST": "true"}])
+def test_responses_vary_on_hx_request_so_back_never_shows_a_bare_partial(
+    signed_in, fake_search, headers
+):
+    fake_search(many_results(1000))
+
+    response = signed_in.get(URL, {"q": "dune", "page": "2"}, **headers)
+
+    assert "HX-Request" in response.headers["Vary"]
+
+
 def test_normal_request_returns_the_full_page(signed_in, fake_search):
     fake_search(many_results(1000))
 
