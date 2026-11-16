@@ -1,0 +1,444 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Not production code.
+  Question: Do the Book Catalog System's privacy rules hold up? For each viewer
+  (Alex, Blair, a logged-out visitor), what can they see on every page and API
+  endpoint as saves are created, edited, shared, removed and pruned?
+  Everything is in memory. Book IDs other than Dune's are made up for the demo.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Rules Demo</title>
+<style>
+  :root { --accent: #4f46e5; --bg: #f7f7f9; --card: #fff; --line: #e4e4ea; --text: #1d1d27; --muted: #6b6b7b;
+    --ok: #15803d; --okbg: #e8f6ed; --bad: #b91c1c; --badbg: #fdecec; --warn: #a16207; --warnbg: #fdf6e3; --chg: #fff7cc; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 24px 24px 8px; max-width: 1400px; margin: auto; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  h3 { font-size: 13px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .lead { color: var(--muted); margin: 0; max-width: 900px; }
+  main { max-width: 1400px; margin: auto; padding: 16px 24px 48px; display: grid; gap: 20px; grid-template-columns: 1fr; }
+  @media (min-width: 1100px) { main { grid-template-columns: 420px 1fr; } #statecol { grid-column: 2; grid-row: 1 / span 3; } }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  button, select { font: inherit; border-radius: 8px; border: 1px solid var(--line); background: #fff; padding: 6px 10px; color: var(--text); }
+  button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .field { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+  #result { padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-weight: 500; }
+  #result.ok { background: var(--okbg); color: var(--ok); } #result.bad { background: var(--badbg); color: var(--bad); }
+  #result.info { background: #eef; color: var(--accent); }
+  .viewer button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .grid2 { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .sec { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fff; }
+  .sec.changed { background: var(--chg); border-color: #e9c95b; }
+  .sec .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .path { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; word-break: break-all; }
+  .sec .name { font-weight: 600; }
+  .chip { font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+  .c2 { background: var(--okbg); color: var(--ok); } .c3 { background: #eee; color: #555; }
+  .c4 { background: var(--badbg); color: var(--bad); } .c5 { background: var(--warnbg); color: var(--warn); }
+  .sec ul { margin: 6px 0 0; padding-left: 18px; } .sec li { margin: 2px 0; }
+  .sec .note { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .newtag { font-size: 11px; color: var(--warn); font-weight: 700; margin-left: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .pill { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: #eee; }
+  .pill.pub { background: var(--okbg); color: var(--ok); } .pill.priv { background: #f1effd; color: var(--accent); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .steps { display: grid; gap: 6px; margin-top: 10px; }
+  .steps button { text-align: left; } .steps button.done { background: var(--okbg); border-color: #b9e2c6; color: var(--ok); }
+  .watch { background: var(--warnbg); border-radius: 8px; padding: 8px 10px; font-size: 14px; margin-top: 8px; }
+  .muted { color: var(--muted); }
+  #ol.up { color: var(--ok); } #ol.down { color: var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Privacy Rules Demo: Book Catalog System</h1>
+  <p class="lead">Do the privacy rules hold up? Pick who is looking (Alex, Blair, or a logged-out visitor), make changes, and watch what that person can see on every website page and API endpoint. Yellow boxes changed after your last action.</p>
+</header>
+
+<main>
+  <!-- CURRENT STATE -->
+  <section id="statecol">
+    <div id="result" class="info">Ready. Nothing has happened yet.</div>
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">What this person sees</h2>
+        <div class="row viewer" id="viewer"></div>
+      </div>
+      <h3>Website pages</h3>
+      <div class="grid2" id="pages"></div>
+      <h3>API endpoints</h3>
+      <div class="grid2" id="api"></div>
+    </div>
+    <div class="panel" style="margin-top:20px">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">The database (only the server sees this)</h2>
+        <span>Open Library: <b id="ol"></b></span>
+      </div>
+      <h3>Books (shared)</h3>
+      <table id="booksTable"></table>
+      <h3>Saved books (one per user per book)</h3>
+      <table id="savesTable"></table>
+    </div>
+  </section>
+
+  <!-- FREE PLAY -->
+  <section class="panel">
+    <h2>Do something</h2>
+    <div class="row">
+      <label class="field">Who does it<select id="fpActor"></select></label>
+      <label class="field">Action<select id="fpAction"></select></label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="field" style="flex:1">On<select id="fpTarget" style="width:100%"></select></label>
+      <label class="field" id="fpValueWrap">Value<select id="fpValue"></select></label>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="primary" id="fpGo">Do it</button>
+      <span class="muted" style="font-size:13px">You can pick anyone's save, so you can try things that should be blocked.</span></div>
+    <h3>Server / admin</h3>
+    <div class="row">
+      <button id="olToggle"></button>
+      <button id="pruneBtn">Run prune_books</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="field" style="flex:1">Admin deletes a book directly<select id="adminBook" style="width:100%"></select></label>
+      <button id="adminGo" style="align-self:end">Delete book</button>
+    </div>
+    <div class="row" style="margin-top:14px"><button id="resetBtn">Reset demo to the starting data</button></div>
+  </section>
+
+  <!-- WALKTHROUGHS -->
+  <section class="panel">
+    <h2>Guided walkthroughs</h2>
+    <div class="tabs" id="tabs"></div>
+    <div id="scenario"></div>
+  </section>
+</main>
+
+<script>
+/* =====================================================================
+   Pure logic module: no DOM. The page calls in; nothing calls out.
+   ===================================================================== */
+const Privacy = (() => {
+  const USERS = ["alex", "blair"];
+  const STATUS = { want_to_read: "Want to read", reading: "Reading", read: "Read" };
+  // Fake Open Library: what a lookup by work ID would return.
+  const OPEN_LIBRARY = {
+    OL893414W: { title: "Dune", authors: "Frank Herbert", year: 1965 },
+    OLDEMO1W: { title: "The Hobbit", authors: "J. R. R. Tolkien", year: 1937 },
+    OLDEMO2W: { title: "Kindred", authors: "Octavia E. Butler", year: 1979 },
+    OLDEMO3W: { title: "Circe", authors: "Madeline Miller", year: 2018 },
+    OLDEMO4W: { title: "Neuromancer", authors: "William Gibson", year: 1984 },
+  };
+
+  function initialState() {
+    return {
+      viewer: "alex",
+      openLibraryUp: true,
+      books: {
+        OL893414W: { ...OPEN_LIBRARY.OL893414W },
+        OLDEMO1W: { ...OPEN_LIBRARY.OLDEMO1W },
+        OLDEMO2W: { ...OPEN_LIBRARY.OLDEMO2W },
+      },
+      saves: [
+        { id: 1, user: "alex", book: "OL893414W", status: "read", rating: 5, isPublic: true },
+        { id: 2, user: "alex", book: "OLDEMO1W", status: "reading", rating: null, isPublic: false },
+        { id: 3, user: "blair", book: "OL893414W", status: "read", rating: 2, isPublic: false },
+        { id: 4, user: "blair", book: "OLDEMO2W", status: "want_to_read", rating: null, isPublic: false },
+      ],
+      nextId: 5,
+      everIds: [1, 2, 3, 4],
+    };
+  }
+
+  const title = (s, key) => (s.books[key] || OPEN_LIBRARY[key]).title;
+  const who = u => (u ? u[0].toUpperCase() + u.slice(1) : "Logged-out visitor");
+  const ok = message => ({ ok: true, code: "200", message });
+  const fail = (code, message) => ({ ok: false, code, message });
+
+  function communityStats(s, key) {
+    const r = s.saves.filter(x => x.book === key && x.rating != null).map(x => x.rating);
+    return { avg: r.length ? Math.round((r.reduce((a, b) => a + b, 0) / r.length) * 10) / 10 : null, count: r.length };
+  }
+  const publicSaves = (s, user) => s.saves.filter(x => x.user === user && x.isPublic);   // the ONE privacy rule
+  const ownSaves = (s, user) => s.saves.filter(x => x.user === user);
+
+  /* apply(state, action) -> { state, result }  (never mutates the input) */
+  function apply(prev, a) {
+    const s = structuredClone(prev);
+    const done = result => ({ state: s, result });
+
+    if (a.type === "view") { s.viewer = a.viewer; return done({ ok: true, code: "", message: `Now looking as: ${who(a.viewer)}` }); }
+    if (a.type === "openLibrary") { s.openLibraryUp = a.up; return done({ ok: true, code: "", message: a.up ? "Open Library is back up." : "Open Library is now DOWN (timeouts / 503)." }); }
+    if (a.type === "prune") {
+      const unused = Object.keys(s.books).filter(k => !s.saves.some(x => x.book === k));
+      unused.forEach(k => delete s.books[k]);
+      return done(ok(unused.length ? `prune_books deleted ${unused.length} unsaved book(s): ${unused.map(k => OPEN_LIBRARY[k].title).join(", ")}.` : "prune_books: nothing to delete. Every book is saved by someone."));
+    }
+    if (a.type === "adminDelete") {
+      if (!s.books[a.book]) return done(fail("404", "That book isn't in the database."));
+      const n = s.saves.filter(x => x.book === a.book).length;
+      if (n) return done(fail("PROTECTED", `Database refused: "${title(s, a.book)}" is still saved by ${n} user(s) (on_delete=PROTECT).`));
+      delete s.books[a.book];
+      return done(ok(`Deleted "${OPEN_LIBRARY[a.book].title}" (nobody had it saved).`));
+    }
+
+    // Everything below changes a user's saved data: sign-in required.
+    if (!a.actor) return done(fail("401", "Sign in required. Website redirects to the sign-in page; API returns 401."));
+
+    if (a.type === "save") {
+      if (s.saves.some(x => x.user === a.actor && x.book === a.book)) return done(fail("400", `"${title(s, a.book)}" is already in ${who(a.actor)}'s Saved Books.`));
+      let fetched = false;
+      if (!s.books[a.book]) {
+        if (!s.openLibraryUp) return done(fail("503", `Open Library is unavailable, so "${OPEN_LIBRARY[a.book].title}" (new to this app) can't be looked up. Saved Books still works.`));
+        s.books[a.book] = { ...OPEN_LIBRARY[a.book] }; fetched = true;
+      }
+      const id = s.nextId++; s.everIds.push(id);
+      s.saves.push({ id, user: a.actor, book: a.book, status: "want_to_read", rating: null, isPublic: false });
+      return done(ok(`${who(a.actor)} saved "${title(s, a.book)}" as save #${id} (private, Want to read). ${fetched ? "Book details were fetched from Open Library." : "Book was already in our database, so Open Library wasn't called."}`));
+    }
+
+    const save = s.saves.find(x => x.id === a.saveId);
+    // Someone else's save (or a deleted one) looks exactly like a missing one.
+    if (!save || save.user !== a.actor) return done(fail("404", `Not found. ${who(a.actor)} has no save #${a.saveId}, and the app doesn't reveal whether it exists.`));
+    const t = title(s, save.book);
+
+    if (a.type === "status") {
+      if (!(a.value in STATUS)) return done(fail("400", `"${a.value}" is not a valid status.`));
+      save.status = a.value; return done(ok(`${who(a.actor)} set "${t}" to ${STATUS[a.value]}.`));
+    }
+    if (a.type === "rating") {
+      if (a.value !== null && !(Number.isInteger(a.value) && a.value >= 1 && a.value <= 5)) return done(fail("400", `Rating ${a.value} rejected. Ratings must be whole numbers 1–5, or empty.`));
+      save.rating = a.value; return done(ok(a.value == null ? `${who(a.actor)} cleared their rating of "${t}".` : `${who(a.actor)} rated "${t}" ${a.value} ★.`));
+    }
+    if (a.type === "public") { save.isPublic = a.value; return done(ok(`${who(a.actor)} made "${t}" ${a.value ? "public" : "private"}.`)); }
+    if (a.type === "remove") { s.saves = s.saves.filter(x => x !== save); return done(ok(`${who(a.actor)} removed "${t}" from Saved Books. The book itself stays in the database.`)); }
+    return done(fail("400", "Unknown action."));
+  }
+
+  /* views(state) -> what state.viewer sees, as plain data */
+  function views(s) {
+    const v = s.viewer;
+    const line = x => `${title(s, x.book)}: ${STATUS[x.status]} · ${x.rating ? x.rating + " ★" : "not rated"}`;
+    const apiSave = x => `{ id: ${x.id}, book: "${title(s, x.book)}", status: "${x.status}", rating: ${x.rating}, is_public: ${x.isPublic} }`;
+    const pages = [], api = [];
+
+    pages.push(v ? { id: "catalog", name: "Search Catalog", path: "/catalog/", code: "200",
+        items: [s.openLibraryUp ? "Can search Open Library." : "Search shows the alert: “Open Library is unavailable right now… Your saved books are still available.”"] }
+      : { id: "catalog", name: "Search Catalog", path: "/catalog/", code: "302", items: ["Redirected to sign-in."] });
+    pages.push(v ? { id: "saved", name: "Saved Books", path: "/saved/", code: "200", items: ownSaves(s, v).map(x => `${line(x)} · ${x.isPublic ? "Public" : "Private"}`), empty: "No saved books yet." }
+      : { id: "saved", name: "Saved Books", path: "/saved/", code: "302", items: ["Redirected to sign-in."] });
+    for (const u of USERS) pages.push({ id: "profile-" + u, name: `${who(u)}'s profile`, path: `/users/${u}/`, code: "200",
+      items: publicSaves(s, u).map(line), empty: "No public books yet.", note: v === u ? "This is your own profile: only public saves show here too." : "" });
+    for (const key of Object.keys(OPEN_LIBRARY)) {
+      if (!s.books[key]) { pages.push({ id: "book-" + key, name: `Book page: ${OPEN_LIBRARY[key].title}`, path: `/books/${key}/`, code: "404", items: ["Not in this app's database."] }); continue; }
+      const st = communityStats(s, key), mine = v && s.saves.find(x => x.user === v && x.book === key);
+      pages.push({ id: "book-" + key, name: `Book page: ${title(s, key)}`, path: `/books/${key}/`, code: "200", items: [
+        `${s.books[key].authors}, ${s.books[key].year}`,
+        st.count ? `Community: ${st.avg.toFixed(1)} ★ from ${st.count} rating${st.count > 1 ? "s" : ""}` : "Community: No ratings yet",
+        mine ? `Your save: ${STATUS[mine.status]} · ${mine.rating ? mine.rating + " ★" : "not rated"} · ${mine.isPublic ? "Public" : "Private"} (edit form shown)` : v ? "Button: Save to my library" : "Button: Sign in to save",
+      ] });
+    }
+
+    api.push(v ? { id: "api-list", name: "My saved books", path: "GET /api/saved-books/", code: "200", items: ownSaves(s, v).map(apiSave), empty: "[]" }
+      : { id: "api-list", name: "My saved books", path: "GET /api/saved-books/", code: "401", items: ["Authentication required."] });
+    for (const id of s.everIds) {
+      const x = s.saves.find(y => y.id === id);
+      const r = !v ? ["401", "Authentication required."] : x && x.user === v ? ["200", apiSave(x)] : ["404", "Not found."];
+      api.push({ id: "api-save-" + id, name: `Save #${id}`, path: `GET /api/saved-books/${id}/`, code: r[0], items: [r[1]],
+        note: r[0] === "404" && x ? `(Really belongs to ${who(x.user)}; the API won't say.)` : r[0] === "404" ? "(This save was removed.)" : "" });
+    }
+    for (const u of USERS) api.push({ id: "api-user-" + u, name: `${who(u)}'s public saves`, path: `GET /api/users/${u}/saved-books/`, code: "200", items: publicSaves(s, u).map(apiSave), empty: "[]" });
+    for (const key of Object.keys(OPEN_LIBRARY)) {
+      if (!s.books[key]) { api.push({ id: "api-book-" + key, name: `Book: ${OPEN_LIBRARY[key].title}`, path: `GET /api/books/${key}/`, code: "404", items: ["Not found."] }); continue; }
+      const st = communityStats(s, key);
+      api.push({ id: "api-book-" + key, name: `Book: ${title(s, key)}`, path: `GET /api/books/${key}/`, code: "200",
+        items: [`{ work_key: "${key}", title: "${title(s, key)}", avg_rating: ${st.avg}, rating_count: ${st.count} }`], note: "No user information included." });
+    }
+    return { pages, api };
+  }
+
+  return { USERS, STATUS, OPEN_LIBRARY, initialState, apply, views, communityStats, who, title };
+})();
+
+/* =====================================================================
+   Page shell
+   ===================================================================== */
+const P = Privacy;
+let state = P.initialState();
+let prevSigs = null;
+const $ = id => document.getElementById(id);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function run(action) {
+  const before = state;
+  const { state: next, result } = P.apply(state, action);
+  state = next;
+  prevSigs = sigs(before);
+  const box = $("result");
+  box.className = result.ok ? (result.code ? "ok" : "info") : "bad";
+  box.textContent = (result.code ? (result.ok ? "✓ " : `✗ ${result.code}: `) : "→ ") + result.message;
+  render();
+  return result;
+}
+function sigs(s) { const v = P.views(s); const m = {}; [...v.pages, ...v.api].forEach(x => m[x.id] = JSON.stringify(x)); m.__viewer = s.viewer; return m; }
+
+function secHTML(x, changed) {
+  const cls = "c" + (x.code[0] || "2");
+  const body = x.items.length ? `<ul>${x.items.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : `<div class="note">${esc(x.empty || "")}</div>`;
+  return `<div class="sec ${changed ? "changed" : ""}"><div class="top"><span class="name">${esc(x.name)}${changed ? '<span class="newtag">CHANGED</span>' : ""}</span><span class="chip ${cls}">${x.code}</span></div>
+    <div class="path muted">${esc(x.path)}</div>${body}${x.note ? `<div class="note">${esc(x.note)}</div>` : ""}</div>`;
+}
+function render() {
+  // viewer switch
+  $("viewer").innerHTML = [...P.USERS, null].map(u => `<button class="${state.viewer === u ? "on" : ""}" data-viewer="${u ?? ""}">${P.who(u)}</button>`).join("");
+  const v = P.views(state);
+  const sameViewer = prevSigs && prevSigs.__viewer === state.viewer;
+  const isChanged = x => sameViewer && prevSigs[x.id] !== undefined && prevSigs[x.id] !== JSON.stringify(x) || (sameViewer && prevSigs[x.id] === undefined);
+  $("pages").innerHTML = v.pages.map(x => secHTML(x, isChanged(x))).join("");
+  $("api").innerHTML = v.api.map(x => secHTML(x, isChanged(x))).join("");
+  // database
+  $("ol").textContent = state.openLibraryUp ? "UP" : "DOWN"; $("ol").className = state.openLibraryUp ? "up" : "down";
+  $("booksTable").innerHTML = `<tr><th>Work ID</th><th>Title</th><th>Saved by</th><th>Community avg</th></tr>` +
+    (Object.keys(state.books).map(k => { const st = P.communityStats(state, k); const by = state.saves.filter(x => x.book === k).map(x => P.who(x.user));
+      return `<tr><td class="path">${k}</td><td>${esc(state.books[k].title)}</td><td>${by.join(", ") || '<span class="muted">nobody (prunable)</span>'}</td><td>${st.count ? st.avg.toFixed(1) + " ★ (" + st.count + ")" : "—"}</td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">No books.</td></tr>`);
+  $("savesTable").innerHTML = `<tr><th>#</th><th>Owner</th><th>Book</th><th>Status</th><th>Rating</th><th>Sharing</th><th>Who can see this save</th></tr>` +
+    (state.saves.map(x => `<tr><td>${x.id}</td><td>${P.who(x.user)}</td><td>${esc(P.title(state, x.book))}</td><td>${P.STATUS[x.status]}</td><td>${x.rating ? x.rating + " ★" : "—"}</td>
+      <td><span class="pill ${x.isPublic ? "pub" : "priv"}">${x.isPublic ? "Public" : "Private"}</span></td><td>${x.isPublic ? "Everyone (profile + API)" : P.who(x.user) + " only"}</td></tr>`).join("") || `<tr><td colspan="7" class="muted">No saves.</td></tr>`);
+  $("olToggle").textContent = state.openLibraryUp ? "Take Open Library down" : "Bring Open Library back up";
+  $("adminBook").innerHTML = Object.keys(state.books).map(k => `<option value="${k}">${esc(state.books[k].title)}</option>`).join("") || "<option disabled>No books</option>";
+  fillTargets();
+  renderScenario();
+}
+
+/* ---------- Free play ---------- */
+const ACTIONS = {
+  save: "Save a book", status: "Change status", rating: "Set rating", clearRating: "Clear rating",
+  makePublic: "Make public", makePrivate: "Make private", remove: "Remove from Saved Books",
+};
+$("fpActor").innerHTML = [...P.USERS, ""].map(u => `<option value="${u}">${P.who(u || null)}</option>`).join("");
+$("fpAction").innerHTML = Object.entries(ACTIONS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
+function fillTargets() {
+  const act = $("fpAction").value, keep = $("fpTarget").value;
+  if (act === "save") $("fpTarget").innerHTML = Object.entries(P.OPEN_LIBRARY).map(([k, b]) => `<option value="${k}">${esc(b.title)}${state.books[k] ? "" : " (new to this app)"}</option>`).join("");
+  else $("fpTarget").innerHTML = state.everIds.map(id => { const x = state.saves.find(y => y.id === id);
+    return `<option value="${id}">Save #${id}${x ? ` · ${P.who(x.user)}'s ${esc(P.title(state, x.book))}` : " · (removed)"}</option>`; }).join("");
+  if ([...$("fpTarget").options].some(o => o.value === keep)) $("fpTarget").value = keep;
+  const vals = act === "status" ? Object.entries(P.STATUS) : act === "rating" ? [[1, "1 ★"], [2, "2 ★"], [3, "3 ★"], [4, "4 ★"], [5, "5 ★"], [0, "0 (invalid)"], [6, "6 (invalid)"]] : null;
+  $("fpValueWrap").style.display = vals ? "" : "none";
+  const keepV = $("fpValue").value;
+  if (vals) { $("fpValue").innerHTML = vals.map(([k, l]) => `<option value="${k}">${l}</option>`).join(""); if ([...$("fpValue").options].some(o => o.value === keepV)) $("fpValue").value = keepV; }
+}
+$("fpAction").onchange = fillTargets;
+$("fpGo").onclick = () => {
+  const actor = $("fpActor").value || null, act = $("fpAction").value, tgt = $("fpTarget").value, val = $("fpValue").value;
+  const map = {
+    save: { type: "save", actor, book: tgt },
+    status: { type: "status", actor, saveId: +tgt, value: val },
+    rating: { type: "rating", actor, saveId: +tgt, value: Number(val) },
+    clearRating: { type: "rating", actor, saveId: +tgt, value: null },
+    makePublic: { type: "public", actor, saveId: +tgt, value: true },
+    makePrivate: { type: "public", actor, saveId: +tgt, value: false },
+    remove: { type: "remove", actor, saveId: +tgt },
+  };
+  run(map[act]);
+};
+$("olToggle").onclick = () => run({ type: "openLibrary", up: !state.openLibraryUp });
+$("pruneBtn").onclick = () => run({ type: "prune" });
+$("adminGo").onclick = () => $("adminBook").value && run({ type: "adminDelete", book: $("adminBook").value });
+$("resetBtn").onclick = () => { state = P.initialState(); prevSigs = null; $("result").className = "info"; $("result").textContent = "Demo reset to the starting data."; activeStep = -1; render(); };
+$("viewer").onclick = e => { const b = e.target.closest("[data-viewer]"); if (b) run({ type: "view", viewer: b.dataset.viewer || null }); };
+
+/* ---------- Guided walkthroughs ---------- */
+const DUNE = "OL893414W", HOBBIT = "OLDEMO1W", KINDRED = "OLDEMO2W", CIRCE = "OLDEMO3W", NEURO = "OLDEMO4W";
+const SCENARIOS = [
+  { name: "1. Sharing a book",
+    about: "The happy path. Alex saves a book that's new to the app, rates it, and shares it. Then a logged-out visitor (say, a friend Alex sent a link to) looks.",
+    watch: "Circe appears on Alex's profile for the visitor, with Alex's rating. The book page shows the community average and “Sign in to save”.",
+    steps: [
+      ["Look as Alex", { type: "view", viewer: "alex" }],
+      ["Alex saves Circe (fetched from Open Library)", { type: "save", actor: "alex", book: CIRCE }],
+      ["Alex rates Circe 4 ★", { type: "rating", actor: "alex", saveId: 5, value: 4 }],
+      ["Alex makes Circe public", { type: "public", actor: "alex", saveId: 5, value: true }],
+      ["Look as a logged-out visitor", { type: "view", viewer: null }],
+    ] },
+  { name: "2. A shared book goes private",
+    about: "Dune is saved by Alex (public, 5 ★) and Blair (private, 2 ★). A visitor is looking when Alex makes Dune private.",
+    watch: "Dune leaves Alex's profile and Alex's public API list. The Dune book page still works (anyone can view book pages) and still shows 3.5 ★ from 2 ratings, which includes Blair's private rating, but nothing says whose.",
+    steps: [
+      ["Look as a logged-out visitor", { type: "view", viewer: null }],
+      ["Alex makes Dune private", { type: "public", actor: "alex", saveId: 1, value: false }],
+    ] },
+  { name: "3. Snooping on someone else",
+    about: "Blair tries to read and change Alex's private save of The Hobbit (save #2) through the API, and a logged-out visitor tries to change something.",
+    watch: "Every attempt by Blair is a 404, the same answer as for a save that doesn't exist, so Blair can't even confirm #2 is real. The visitor gets 401 (sign in first).",
+    steps: [
+      ["Look as Blair", { type: "view", viewer: "blair" }],
+      ["Blair changes save #2's status to Read", { type: "status", actor: "blair", saveId: 2, value: "read" }],
+      ["Blair makes save #2 public", { type: "public", actor: "blair", saveId: 2, value: true }],
+      ["Blair removes save #2", { type: "remove", actor: "blair", saveId: 2 }],
+      ["Look as a logged-out visitor", { type: "view", viewer: null }],
+      ["Visitor tries to rate save #1", { type: "rating", actor: null, saveId: 1, value: 1 }],
+    ] },
+  { name: "4. Open Library goes down",
+    about: "Open Library stops responding while Alex is using the app.",
+    watch: "Everything built from our database keeps working. Saving Kindred works (Blair already saved it, so it's local). Saving Neuromancer (new) fails with a 503 message until Open Library returns.",
+    steps: [
+      ["Look as Alex", { type: "view", viewer: "alex" }],
+      ["Open Library goes down", { type: "openLibrary", up: false }],
+      ["Alex saves Kindred (already in our database)", { type: "save", actor: "alex", book: KINDRED }],
+      ["Alex saves Neuromancer (new to the app)", { type: "save", actor: "alex", book: NEURO }],
+      ["Open Library comes back", { type: "openLibrary", up: true }],
+      ["Alex saves Neuromancer again", { type: "save", actor: "alex", book: NEURO }],
+    ] },
+  { name: "5. Removing and pruning",
+    about: "An admin tries to delete a saved book, Blair removes the only save of Kindred, then prune_books runs.",
+    watch: "Deleting Dune is refused (it's saved). After Blair's removal, Kindred's book stays in the database and its page still works. prune_books deletes only Kindred, and then its page and API endpoint become 404.",
+    steps: [
+      ["Look as a logged-out visitor", { type: "view", viewer: null }],
+      ["Admin tries to delete Dune", { type: "adminDelete", book: DUNE }],
+      ["Blair removes Kindred (its only save)", { type: "remove", actor: "blair", saveId: 4 }],
+      ["Run prune_books", { type: "prune" }],
+    ] },
+  { name: "6. Bad input and a lone rating",
+    about: "Alex sends invalid ratings and a duplicate save, then clears the Dune rating.",
+    watch: "6 ★ and 0 ★ are rejected, and so is saving Dune twice. After Alex clears the rating, Dune's community average is “2.0 ★ from 1 rating”: that's Blair's private rating, shown anonymously. Is a single-rater average acceptable to you?",
+    steps: [
+      ["Look as Alex", { type: "view", viewer: "alex" }],
+      ["Alex rates Dune 6 ★", { type: "rating", actor: "alex", saveId: 1, value: 6 }],
+      ["Alex rates Dune 0 ★", { type: "rating", actor: "alex", saveId: 1, value: 0 }],
+      ["Alex saves Dune again", { type: "save", actor: "alex", book: DUNE }],
+      ["Alex clears the Dune rating", { type: "rating", actor: "alex", saveId: 1, value: null }],
+    ] },
+];
+let activeScenario = 0, activeStep = -1;
+$("tabs").innerHTML = SCENARIOS.map((s, i) => `<button data-tab="${i}">${esc(s.name)}</button>`).join("");
+$("tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; activeScenario = +b.dataset.tab; activeStep = -1; renderScenario(); };
+function renderScenario() {
+  [...$("tabs").children].forEach((b, i) => b.classList.toggle("on", i === activeScenario));
+  const sc = SCENARIOS[activeScenario];
+  $("scenario").innerHTML = `<p style="margin:0">${esc(sc.about)}</p><div class="watch"><b>Watch for:</b> ${esc(sc.watch)}</div>
+    <div class="steps"><button class="primary" data-start>${activeStep < 0 ? "▶ Start (resets the demo)" : "↺ Restart (resets the demo)"}</button>
+    ${sc.steps.map(([label], i) => `<button data-step="${i}" class="${i < activeStep ? "done" : ""}" ${i === activeStep ? "" : "disabled"}>${i < activeStep ? "✓ " : i + 1 + ". "}${esc(label)}</button>`).join("")}</div>
+    ${activeStep >= sc.steps.length ? `<p class="muted">Scenario finished. Look at the yellow boxes, or keep experimenting with “Do something”.</p>` : ""}`;
+}
+$("scenario").onclick = e => {
+  const b = e.target.closest("button"); if (!b || b.disabled) return;
+  if (b.hasAttribute("data-start")) { state = P.initialState(); prevSigs = null; activeStep = 0; $("result").className = "info"; $("result").textContent = `Scenario “${SCENARIOS[activeScenario].name}” started from the starting data.`; render(); return; }
+  const i = +b.dataset.step; activeStep = i + 1; run(SCENARIOS[activeScenario].steps[i][1]);
+};
+
+render();
+</script>
+</body>
+</html>

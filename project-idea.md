@@ -8,7 +8,7 @@ Technology requirments:
 - uv
 - Ruff
 - Tailwind CSS with DaisyUI using django-tailwind-cli
-- HTMX
+- HTMX (to minimize unnecessary page reloads)
 - pytest
 
 Business requirements:

@@ -1,0 +1,447 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Not production code.
+  Question: Which of three structurally different Saved Books layouts should
+  become the UI convention for the whole Book Catalog System?
+  Fake in-memory data; nothing is saved. Tailwind + DaisyUI come from a CDN here
+  only; production builds CSS locally with django-tailwind-cli.
+-->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saved Books Prototype</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5.0.0/daisyui.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5.0.0/themes.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.0/dist/index.global.js"></script>
+<style>
+  /* Prototype switcher: deliberately NOT DaisyUI so it stays visually separate. */
+  #proto { position: fixed; right: 12px; bottom: 12px; z-index: 9999; width: 340px; max-width: calc(100vw - 24px);
+    background: #111827; color: #e5e7eb; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.35); border: 1px solid #374151; }
+  #proto button, #proto select { background: #1f2937; color: #f9fafb; border: 1px solid #4b5563; border-radius: 6px; padding: 3px 8px; font: inherit; cursor: pointer; }
+  #proto button:hover { background: #374151; }
+  #proto .row { display: flex; align-items: center; gap: 6px; padding: 8px 10px; }
+  #proto .head { border-bottom: 1px solid #374151; justify-content: space-between; }
+  #proto .name { flex: 1; text-align: center; font-weight: 700; color: #fde68a; }
+  #proto dl { margin: 0; padding: 4px 10px 10px; display: grid; grid-template-columns: 78px 1fr; gap: 3px 8px; }
+  #proto dt { color: #9ca3af; } #proto dd { margin: 0; word-break: break-all; }
+  #proto .changed { color: #86efac; }
+  #proto.min dl, #proto.min .opts { display: none; }
+  body { padding-bottom: 260px; }
+</style>
+</head>
+<body class="bg-base-200 min-h-screen">
+
+<div id="app"></div>
+
+<div id="proto" aria-label="Prototype controls">
+  <div class="row head">
+    <button id="prev" title="Previous variant (←)">◀</button>
+    <span class="name" id="vname"></span>
+    <button id="next" title="Next variant (→)">▶</button>
+    <button id="min" title="Collapse">–</button>
+  </div>
+  <div class="row opts">
+    <span style="color:#9ca3af">Theme</span>
+    <select id="theme">
+      <option>light</option><option>dark</option><option>corporate</option>
+      <option>nord</option><option>cupcake</option><option>dim</option>
+    </select>
+    <span style="color:#9ca3af;margin-left:auto">PROTOTYPE · fake data</span>
+  </div>
+  <dl id="pstate"></dl>
+</div>
+
+<script>
+/* ---------------- Fake data ---------------- */
+const STATUS = { want_to_read: "Want to read", reading: "Reading", read: "Read" };
+const STATUS_BADGE = { want_to_read: "badge-ghost", reading: "badge-info", read: "badge-success" };
+const RAW = [
+  ["Dune", "Frank Herbert", 1965, "read", 5, true, 4.6, 5],
+  ["The Hobbit", "J. R. R. Tolkien", 1937, "read", 4, true, 4.4, 7],
+  ["Project Hail Mary", "Andy Weir", 2021, "reading", null, false, 4.8, 3],
+  ["Pride and Prejudice", "Jane Austen", 1813, "want_to_read", null, false, 4.1, 4],
+  ["The Left Hand of Darkness", "Ursula K. Le Guin", 1969, "read", 3, false, 3.9, 2],
+  ["Beloved", "Toni Morrison", 1987, "want_to_read", null, true, null, 0],
+  ["The Name of the Wind", "Patrick Rothfuss", 2007, "read", 4, true, 4.2, 6],
+  ["Good Omens", "Terry Pratchett; Neil Gaiman", 1990, "reading", null, true, 4.5, 4],
+  ["Frankenstein", "Mary Shelley", 1818, "read", 2, false, 3.5, 2],
+  ["The Martian", "Andy Weir", 2011, "read", 5, false, 4.7, 5],
+  ["Circe", "Madeline Miller", 2018, "want_to_read", null, false, 4.3, 3],
+  ["Neuromancer", "William Gibson", 1984, "read", 3, true, 3.8, 2],
+  ["The Road", "Cormac McCarthy", 2006, "want_to_read", null, false, 3.7, 1],
+  ["Station Eleven", "Emily St. John Mandel", 2014, "reading", null, false, 4.0, 2],
+  ["Kindred", "Octavia E. Butler", 1979, "read", 5, true, 4.9, 3],
+  ["The Remains of the Day", "Kazuo Ishiguro", 1989, "want_to_read", null, false, null, 0],
+  ["1984", "George Orwell", 1949, "read", 4, false, 4.2, 8],
+];
+const books = RAW.map(([title, authors, year, status, rating, pub, avg, count], i) => ({
+  id: i + 1, title, authors, year, status, rating, is_public: pub, avg, count,
+  saved: new Date(Date.UTC(2026, 10, 15 - i * 3)),
+}));
+const PER_PAGE = 12;
+
+/* ---------------- Query logic (mirrors the planned single filter function) ---------------- */
+const DEFAULTS = { q: "", status: "", rating: "", visibility: "", sort: "-saved", page: 1 };
+const state = { ...DEFAULTS };
+let shownIds = [], total = 0, pages = 1, selectedId = null;
+let lastAction = "Page loaded", lastKind = "list";
+
+function matches(b, s = state, skip = "") {
+  const q = s.q.trim().toLowerCase();
+  if (q && !(b.title.toLowerCase().includes(q) || b.authors.toLowerCase().includes(q))) return false;
+  if (skip !== "status" && s.status && b.status !== s.status) return false;
+  if (s.rating === "unrated" && b.rating != null) return false;
+  if (s.rating && s.rating !== "unrated" && b.rating !== Number(s.rating)) return false;
+  if (s.visibility === "public" && !b.is_public) return false;
+  if (s.visibility === "private" && b.is_public) return false;
+  return true;
+}
+const SORTS = {
+  "-saved": ["Recently saved", (a, b) => b.saved - a.saved],
+  "title": ["Title A–Z", (a, b) => a.title.localeCompare(b.title)],
+  "year": ["Year published", (a, b) => a.year - b.year],
+  "-rating": ["My rating", (a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.title.localeCompare(b.title)],
+};
+function refreshList(action) {
+  const list = books.filter(b => matches(b)).sort(SORTS[state.sort][1]);
+  total = list.length;
+  pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  state.page = Math.min(state.page, pages);
+  shownIds = list.slice((state.page - 1) * PER_PAGE, state.page * PER_PAGE).map(b => b.id);
+  if (!shownIds.includes(selectedId)) selectedId = shownIds[0] ?? null;
+  lastAction = action; lastKind = "list"; flashId = null;
+  renderResults();
+}
+function editBook(id, field, value) {
+  const b = books.find(x => x.id === id);
+  if (field === "status") { b.status = value; lastAction = `"${b.title}" status → ${STATUS[value]} (only this card swapped)`; }
+  if (field === "rating") { b.rating = value; lastAction = `"${b.title}" rating → ${value == null ? "Not rated" : value + " ★"} (only this card swapped)`; }
+  if (field === "public") { b.is_public = value; lastAction = `"${b.title}" → ${value ? "Public" : "Private"} (only this card swapped)`; }
+  lastKind = "card"; flashId = id;
+  renderResults();
+  setTimeout(() => document.querySelectorAll(`[data-flash="${id}"]`).forEach(e => e.remove()), 1800);
+}
+let flashId = null;
+function queryString() {
+  const p = new URLSearchParams();
+  for (const k of ["q", "status", "rating", "visibility"]) if (state[k]) p.set(k, state[k]);
+  if (state.sort !== DEFAULTS.sort) p.set("sort", state.sort);
+  if (state.page > 1) p.set("page", state.page);
+  const s = p.toString();
+  return "/saved/" + (s ? "?" + s : "");
+}
+
+/* ---------------- Shared view pieces ---------------- */
+const byId = id => books.find(b => b.id === id);
+function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function cover(b, cls = "") {
+  const h = hue(b.title);
+  return `<div class="${cls} flex items-end p-2 text-white font-semibold leading-tight overflow-hidden"
+    style="background:linear-gradient(160deg,hsl(${h} 45% 45%),hsl(${(h + 40) % 360} 50% 25%))">
+    <span class="text-[0.7em] drop-shadow">${b.title}</span></div>`;
+}
+function stars(b, size = "") {
+  if (b.rating == null) return `<span class="text-xs opacity-60 ${size}">Not rated</span>`;
+  return `<span class="text-warning ${size}" title="${b.rating} of 5">${"★".repeat(b.rating)}<span class="opacity-30">${"★".repeat(5 - b.rating)}</span></span>`;
+}
+function starPicker(b) {
+  const radios = [1, 2, 3, 4, 5].map(n => `<input type="radio" name="rating-${b.id}" class="mask mask-star-2 bg-warning"
+    data-edit="rating" data-id="${b.id}" value="${n}" aria-label="${n} star${n > 1 ? "s" : ""}" ${b.rating === n ? "checked" : ""}>`).join("");
+  return `<div class="flex items-center gap-2 min-h-6">
+    <div class="rating rating-sm">${radios}</div>
+    ${b.rating == null
+      ? `<span class="text-xs opacity-60">Not rated</span>`
+      : `<button class="btn btn-ghost btn-xs px-1 opacity-60 hover:opacity-100" data-clear-rating="${b.id}" title="Clear rating" aria-label="Clear rating">✕</button>`}
+  </div>`;
+}
+function statusSelect(b, size = "select-sm") {
+  return `<select class="select ${size}" data-edit="status" data-id="${b.id}" aria-label="Status for ${b.title}">
+    ${Object.entries(STATUS).map(([v, l]) => `<option value="${v}" ${b.status === v ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+}
+function publicToggle(b, size = "toggle-sm", label = true) {
+  return `<label class="flex items-center gap-2 cursor-pointer text-sm">
+    <input type="checkbox" class="toggle ${size} toggle-primary" data-edit="public" data-id="${b.id}" ${b.is_public ? "checked" : ""} aria-label="Public">
+    ${label ? `<span>${b.is_public ? "Public" : "Private"}</span>` : ""}</label>`;
+}
+function feedback(b) {
+  let out = "";
+  if (flashId === b.id) out += `<span data-flash="${b.id}" class="text-success text-xs font-medium">Saved ✓</span>`;
+  if (!matches(b)) out += `<div class="text-xs text-warning">No longer matches your filters; it leaves the list when you change filters or pages.</div>`;
+  return out;
+}
+function pager() {
+  return `<div class="flex justify-center mt-6"><div class="join">
+    <button class="join-item btn btn-sm" data-page="${state.page - 1}" ${state.page <= 1 ? "disabled" : ""}>« Previous</button>
+    <button class="join-item btn btn-sm btn-active pointer-events-none">Page ${state.page} of ${pages}</button>
+    <button class="join-item btn btn-sm" data-page="${state.page + 1}" ${state.page >= pages ? "disabled" : ""}>Next »</button>
+  </div></div>`;
+}
+function empty() {
+  return `<div class="text-center py-16 opacity-80"><p class="text-lg font-medium">No saved books match these filters.</p>
+    <button class="btn btn-sm btn-ghost mt-3" data-clear>Clear filters</button></div>`;
+}
+const opt = (v, l, cur) => `<option value="${v}" ${cur === v ? "selected" : ""}>${l}</option>`;
+function filterSelects(cls = "select select-sm") {
+  return `
+  <select class="${cls}" data-filter="status" aria-label="Status">${opt("", "All statuses", state.status)}${Object.entries(STATUS).map(([v, l]) => opt(v, l, state.status)).join("")}</select>
+  ${ratingSelect(cls)}
+  <select class="${cls}" data-filter="visibility" aria-label="Visibility">${opt("", "Public & private", state.visibility)}${opt("public", "Public only", state.visibility)}${opt("private", "Private only", state.visibility)}</select>
+  ${sortSelect(cls)}`;
+}
+function ratingSelect(cls) {
+  return `<select class="${cls}" data-filter="rating" aria-label="Rating">${opt("", "Any rating", state.rating)}${[5, 4, 3, 2, 1].map(n => opt(String(n), "★".repeat(n), state.rating)).join("")}${opt("unrated", "Unrated", state.rating)}</select>`;
+}
+function sortSelect(cls) {
+  return `<select class="${cls}" data-filter="sort" aria-label="Sort">${Object.entries(SORTS).map(([v, [l]]) => opt(v, "Sort: " + l, state.sort)).join("")}</select>`;
+}
+function searchBox(cls = "") {
+  return `<label class="input input-sm ${cls}"><span class="opacity-50">🔍</span>
+    <input type="search" id="q" placeholder="Search title or author" value="${state.q}"></label>`;
+}
+const NAV = [["Search Catalog", false], ["Saved Books", true], ["My Profile", false]];
+
+/* ---------------- Variant A: Shelf grid ---------------- */
+const A = {
+  key: "A", name: "Shelf grid",
+  shell() {
+    return `
+    <div class="navbar bg-base-100 shadow-sm px-4">
+      <div class="flex-1"><a class="text-lg font-bold">📚 Book Catalog</a></div>
+      <ul class="menu menu-horizontal px-1 hidden sm:flex">${NAV.map(([l, a]) => `<li><a class="${a ? "menu-active" : ""}">${l}</a></li>`).join("")}</ul>
+      <div class="dropdown dropdown-end"><div tabindex="0" role="button" class="btn btn-ghost btn-sm">quinn ▾</div>
+        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box w-40 shadow z-10">${NAV.map(([l]) => `<li class="sm:hidden"><a>${l}</a></li>`).join("")}<li><a>Sign out</a></li></ul></div>
+    </div>
+    <main class="max-w-6xl mx-auto px-4 py-6">
+      <h1 class="text-2xl font-bold">Saved Books</h1>
+      <div class="flex flex-wrap gap-2 mt-4 p-3 bg-base-100 rounded-box shadow-sm">
+        ${searchBox("w-full sm:w-64")}${filterSelects()}
+        <button class="btn btn-sm btn-ghost" data-clear>Clear</button>
+      </div>
+      <div id="results"></div>
+    </main>`;
+  },
+  results() {
+    if (!total) return empty();
+    return `<p class="text-sm opacity-70 mt-4">${total} saved book${total === 1 ? "" : "s"}</p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
+      ${shownIds.map(byId).map(b => `
+      <div class="card bg-base-100 shadow-sm border border-base-300">
+        <a href="#" title="Open book page">${cover(b, "aspect-[2/3] rounded-t-box text-lg")}</a>
+        <div class="card-body p-3 gap-2">
+          <a href="#" class="font-semibold leading-tight link-hover">${b.title}</a>
+          <p class="text-xs opacity-70 -mt-1">${b.authors} · ${b.year}</p>
+          ${starPicker(b)}
+          ${statusSelect(b, "select-sm w-full")}
+          <div class="flex items-center justify-between">${publicToggle(b)}${feedback(b).includes("Saved ✓") ? `<span data-flash="${b.id}" class="text-success text-xs font-medium">Saved ✓</span>` : ""}</div>
+          ${!matches(b) ? `<div class="text-xs text-warning">No longer matches your filters; it leaves the list when you change filters or pages.</div>` : ""}
+        </div>
+      </div>`).join("")}
+    </div>${pager()}`;
+  },
+};
+
+/* ---------------- Variant B: Sidebar + sortable table ---------------- */
+const B = {
+  key: "B", name: "Sidebar + table",
+  shell() {
+    return `
+    <div class="drawer lg:drawer-open">
+      <input id="nav-drawer" type="checkbox" class="drawer-toggle">
+      <div class="drawer-content">
+        <div class="navbar bg-base-100 lg:hidden"><label for="nav-drawer" class="btn btn-ghost btn-sm">☰</label><span class="font-bold ml-2">Book Catalog</span></div>
+        <main class="p-4 lg:p-8 max-w-6xl">
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <div><h1 class="text-2xl font-bold">Saved Books</h1><p class="text-sm opacity-70">Your private reading list. Toggle Public to show a book on your profile.</p></div>
+            <div class="flex flex-wrap gap-2">${searchBox("w-full sm:w-60")}${ratingSelect("select select-sm")}
+              <select class="select select-sm" data-filter="visibility" aria-label="Visibility">${opt("", "Public & private", state.visibility)}${opt("public", "Public only", state.visibility)}${opt("private", "Private only", state.visibility)}</select></div>
+          </div>
+          <div id="results"></div>
+        </main>
+      </div>
+      <div class="drawer-side z-20">
+        <label for="nav-drawer" class="drawer-overlay"></label>
+        <aside class="bg-base-100 w-60 min-h-full border-r border-base-300 p-4">
+          <div class="font-bold text-lg mb-4">📚 Book Catalog</div>
+          <ul class="menu w-full p-0">${NAV.map(([l, a]) => `<li><a class="${a ? "menu-active" : ""}">${l}</a></li>`).join("")}</ul>
+          <div class="divider"></div>
+          <ul class="menu w-full p-0"><li><a>Sign out (quinn)</a></li></ul>
+        </aside>
+      </div>
+    </div>`;
+  },
+  results() {
+    const counts = { "": 0 }; Object.keys(STATUS).forEach(k => counts[k] = 0);
+    books.filter(b => matches(b, state, "status")).forEach(b => { counts[""]++; counts[b.status]++; });
+    const tab = (v, l) => `<a role="tab" class="tab ${state.status === v ? "tab-active" : ""}" data-tab="${v}">${l} <span class="badge badge-sm ml-1">${counts[v]}</span></a>`;
+    const th = (key, label, cls = "") => {
+      const on = state.sort === key;
+      return `<th class="${cls}"><button class="flex items-center gap-1 font-semibold ${on ? "text-primary" : ""}" data-sort="${key}">${label}${on ? " ▾" : ""}</button></th>`;
+    };
+    const rows = shownIds.map(byId).map(b => `
+      <tr class="${!matches(b) ? "opacity-60" : ""}">
+        <td><div class="flex items-center gap-3">${cover(b, "w-9 h-12 rounded text-[8px] shrink-0")}
+          <div><a href="#" class="font-medium link-hover">${b.title}</a><div class="text-xs opacity-60">${b.authors}</div>
+          ${feedback(b)}</div></div></td>
+        <td class="hidden md:table-cell">${b.year}</td>
+        <td class="hidden sm:table-cell whitespace-nowrap">${stars(b)}</td>
+        <td>${statusSelect(b, "select-xs")}</td>
+        <td>${publicToggle(b, "toggle-xs", false)}</td>
+        <td class="hidden md:table-cell text-xs opacity-70 whitespace-nowrap">${b.saved.toISOString().slice(0, 10)}</td>
+      </tr>`).join("");
+    return `
+      <div role="tablist" class="tabs tabs-border mt-4 overflow-x-auto">${tab("", "All")}${Object.entries(STATUS).map(([v, l]) => tab(v, l)).join("")}</div>
+      ${!total ? empty() : `
+      <div class="overflow-x-auto bg-base-100 rounded-box border border-base-300 mt-3">
+        <table class="table table-sm">
+          <thead><tr>${th("title", "Book")}${th("year", "Year", "hidden md:table-cell")}${th("-rating", "My rating", "hidden sm:table-cell")}<th>Status</th><th>Public</th>${th("-saved", "Saved", "hidden md:table-cell")}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="text-xs opacity-60 mt-2">Click a column heading to sort. ${total} book${total === 1 ? "" : "s"}.</p>${pager()}`}`;
+  },
+};
+
+/* ---------------- Variant C: Filter rail + list + detail panel ---------------- */
+const C = {
+  key: "C", name: "List + detail panel",
+  shell() {
+    const radio = (field, v, l) => `<label class="flex items-center gap-2 cursor-pointer py-1"><input type="radio" class="radio radio-sm" name="${field}" data-filter="${field}" value="${v}" ${state[field] === v ? "checked" : ""}><span class="text-sm">${l}</span></label>`;
+    return `
+    <div class="navbar bg-base-100 border-b border-base-300 px-4 gap-2">
+      <a class="font-bold text-lg flex-1">📚 Book Catalog</a>
+      <div role="tablist" class="tabs tabs-box tabs-sm hidden sm:flex">${NAV.map(([l, a]) => `<a role="tab" class="tab ${a ? "tab-active" : ""}">${l}</a>`).join("")}</div>
+      <button class="btn btn-ghost btn-sm">Sign out</button>
+    </div>
+    <div class="max-w-7xl mx-auto p-4 grid gap-4 lg:grid-cols-[220px_1fr_340px]">
+      <aside>
+        <details class="collapse collapse-arrow bg-base-100 border border-base-300 lg:collapse-open" open>
+          <summary class="collapse-title font-semibold">Filters</summary>
+          <div class="collapse-content space-y-4">
+            ${searchBox("w-full")}
+            <div><div class="text-xs font-semibold uppercase opacity-60 mb-1">Status</div>
+              ${radio("status", "", "All")}${Object.entries(STATUS).map(([v, l]) => radio("status", v, l)).join("")}</div>
+            <div><div class="text-xs font-semibold uppercase opacity-60 mb-1">Visibility</div>
+              ${radio("visibility", "", "All")}${radio("visibility", "public", "Public")}${radio("visibility", "private", "Private")}</div>
+            <div><div class="text-xs font-semibold uppercase opacity-60 mb-1">My rating</div>${ratingSelect("select select-sm w-full")}</div>
+            <div><div class="text-xs font-semibold uppercase opacity-60 mb-1">Sort</div>${sortSelect("select select-sm w-full")}</div>
+            <button class="btn btn-sm btn-ghost w-full" data-clear>Clear filters</button>
+          </div>
+        </details>
+      </aside>
+      <div id="results" class="contents"></div>
+    </div>`;
+  },
+  results() {
+    const sel = byId(selectedId);
+    const list = !total ? `<section class="bg-base-100 rounded-box border border-base-300">${empty()}</section>` : `
+      <section>
+        <div class="flex items-baseline justify-between mb-2"><h1 class="text-xl font-bold">Saved Books</h1><span class="text-sm opacity-60">${total} books</span></div>
+        <ul class="list bg-base-100 rounded-box border border-base-300">
+          ${shownIds.map(byId).map(b => `
+          <li class="list-row cursor-pointer items-center ${b.id === selectedId ? "bg-primary/10" : "hover:bg-base-200"} ${!matches(b) ? "opacity-60" : ""}" data-select="${b.id}">
+            ${cover(b, "w-10 h-14 rounded text-[8px]")}
+            <div class="min-w-0"><div class="font-medium truncate">${b.title}</div><div class="text-xs opacity-60 truncate">${b.authors} · ${b.year}</div></div>
+            <div class="flex flex-col items-end gap-1"><span class="badge badge-sm ${STATUS_BADGE[b.status]}">${STATUS[b.status]}</span>
+              <span class="text-xs">${b.is_public ? "🌐 Public" : "🔒 Private"}</span></div>
+          </li>`).join("")}
+        </ul>${pager()}
+      </section>`;
+    const panel = !sel ? `<aside></aside>` : `
+      <aside class="lg:sticky lg:top-4 self-start">
+        <div class="card bg-base-100 border border-base-300">
+          <div class="card-body gap-3">
+            <div class="flex gap-4">${cover(sel, "w-24 h-36 rounded-box text-sm shrink-0")}
+              <div><h2 class="card-title leading-tight">${sel.title}</h2><p class="text-sm opacity-70">${sel.authors}</p><p class="text-sm opacity-70">First published ${sel.year}</p>
+              <p class="text-sm mt-2">Community: ${sel.avg != null ? `<b>${sel.avg.toFixed(1)} ★</b> <span class="opacity-60">from ${sel.count} ratings</span>` : `<span class="opacity-60">No ratings yet</span>`}</p></div></div>
+            <div class="divider my-0"></div>
+            <div class="flex items-center justify-between"><span class="text-sm font-medium">My rating</span>${stars(sel)}</div>
+            <div class="flex items-center justify-between gap-2"><span class="text-sm font-medium">Status</span>${statusSelect(sel)}</div>
+            <div class="flex items-center justify-between"><span class="text-sm font-medium">Show on my profile</span>${publicToggle(sel)}</div>
+            <div class="min-h-5">${feedback(sel)}</div>
+            <div class="card-actions justify-between items-center">
+              <button class="btn btn-ghost btn-sm text-error">Remove</button>
+              <a href="#" class="btn btn-primary btn-sm">Rate on book page →</a>
+            </div>
+            <p class="text-xs opacity-60">Saved ${sel.saved.toISOString().slice(0, 10)}</p>
+          </div>
+        </div>
+      </aside>`;
+    return list + panel;
+  },
+};
+
+/* ---------------- Wiring ---------------- */
+const VARIANTS = [A, B, C];
+let vi = 0;
+try { vi = Math.max(0, VARIANTS.findIndex(v => v.key === localStorage.getItem("proto-sb-variant"))); } catch (e) {}
+try { const t = localStorage.getItem("proto-sb-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+const app = document.getElementById("app");
+
+function renderAll() {
+  const v = VARIANTS[vi];
+  app.innerHTML = v.shell();
+  document.getElementById("vname").textContent = `${v.key} · ${v.name}  (${vi + 1}/${VARIANTS.length})`;
+  try { localStorage.setItem("proto-sb-variant", v.key); } catch (e) {}
+  renderResults();
+}
+function renderResults() {
+  const el = document.getElementById("results");
+  if (el) el.innerHTML = VARIANTS[vi].results();
+  renderState();
+}
+function renderState() {
+  const statuses = Object.fromEntries(Object.keys(STATUS).map(k => [k, books.filter(b => b.status === k).length]));
+  const stale = shownIds.filter(id => !matches(byId(id))).length;
+  document.getElementById("pstate").innerHTML = `
+    <dt>URL</dt><dd>${queryString()}</dd>
+    <dt>Showing</dt><dd>${shownIds.length} on page ${state.page}/${pages} · ${total} match</dd>
+    <dt>Stale cards</dt><dd>${stale} (edited, no longer match)</dd>
+    <dt>All books</dt><dd>${books.length}: ${statuses.want_to_read} want · ${statuses.reading} reading · ${statuses.read} read · ${books.filter(b => b.is_public).length} public</dd>
+    <dt>Last swap</dt><dd class="changed">${lastKind === "card" ? "[one card]" : "[whole list]"} ${lastAction}</dd>`;
+}
+function switchVariant(d) { vi = (vi + d + VARIANTS.length) % VARIANTS.length; renderAll(); }
+
+let qTimer;
+app.addEventListener("input", e => {
+  if (e.target.id !== "q") return;
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { state.q = e.target.value; state.page = 1; refreshList(`Searched "${state.q}"`); }, 300);
+});
+app.addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.filter) { state[t.dataset.filter] = t.value; state.page = 1; refreshList(`${t.dataset.filter} → ${t.value || "any"}`); }
+  else if (t.dataset.edit === "status") editBook(Number(t.dataset.id), "status", t.value);
+  else if (t.dataset.edit === "public") editBook(Number(t.dataset.id), "public", t.checked);
+  else if (t.dataset.edit === "rating") editBook(Number(t.dataset.id), "rating", Number(t.value));
+});
+app.addEventListener("click", e => {
+  const t = e.target.closest("[data-page],[data-clear],[data-clear-rating],[data-tab],[data-sort],[data-select],a[href='#']");
+  if (!t) return;
+  if (t.dataset.clearRating) { editBook(Number(t.dataset.clearRating), "rating", null); return; }
+  if (t.matches("a[href='#']")) { e.preventDefault(); lastAction = "Would open the book page (not part of this prototype)"; renderState(); return; }
+  if (t.dataset.page) { state.page = Number(t.dataset.page); refreshList(`Went to page ${state.page}`); window.scrollTo({ top: 0 }); }
+  else if (t.hasAttribute("data-clear")) { Object.assign(state, DEFAULTS); renderAll(); refreshList("Cleared filters"); }
+  else if (t.dataset.tab !== undefined) { state.status = t.dataset.tab; state.page = 1; refreshList(`Status tab → ${t.dataset.tab || "All"}`); }
+  else if (t.dataset.sort) { state.sort = t.dataset.sort; state.page = 1; refreshList(`Sorted by ${SORTS[state.sort][0]}`); }
+  else if (t.dataset.select && !e.target.closest("select,input,label")) { selectedId = Number(t.dataset.select); lastAction = `Selected "${byId(selectedId).title}"`; lastKind = "card"; renderResults(); }
+});
+
+document.getElementById("prev").onclick = () => switchVariant(-1);
+document.getElementById("next").onclick = () => switchVariant(1);
+document.getElementById("min").onclick = e => { const p = document.getElementById("proto"); p.classList.toggle("min"); e.target.textContent = p.classList.contains("min") ? "+" : "–"; };
+const themeSel = document.getElementById("theme");
+themeSel.value = document.documentElement.dataset.theme;
+themeSel.onchange = () => { document.documentElement.dataset.theme = themeSel.value; try { localStorage.setItem("proto-sb-theme", themeSel.value); } catch (e) {} };
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input,select,textarea")) return;
+  if (e.key === "ArrowLeft") switchVariant(-1);
+  if (e.key === "ArrowRight") switchVariant(1);
+});
+
+renderAll();
+refreshList("Page loaded");
+</script>
+</body>
+</html>
