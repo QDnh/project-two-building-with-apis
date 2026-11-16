@@ -28,6 +28,31 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 2: book models, book page and demo data
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 2`
+2. (Answer to "run the /tdd skill?") Yes, run /tdd (Recommended)
+3. yes, approved. (the three TDD behaviors)
+4. yes, approved. (community average test)
+5. Yes. (move on to behavior 2)
+6. yes, approved. (database rating constraint test)
+7. Yes. (move on to behavior 3)
+8. yes, approved. (book page community average tests)
+9. Yes, finish Phase 2.
+10. It all works. Two things. One, can we swap everything to dark mode. Two, are you building things with class based views?
+11. (Answer to "which view style?") Class-based throughout
+12. Another question. What happens when a user account is deleted? We didn't discuss that in the grill-me.
+13. This is actually the behavior I wanted. Just checking to make sure things wouldn't break.
+14. I'm still manually testing, so go ahead and put the test in.
+15. Okay, dark mode and site still works.
+16. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 2. `Book` (short work ID validated and unique, authors joined with "; ", ISBNs/subjects capped at 10) and `SavedBook` (unique per user and book, `PROTECT` on the book, rating validators plus a database check constraint allowing empty or 1–5, private / Want to read / unrated by default), both in the admin. `Book.community_rating()` returns a `Decimal` average rounded half up to one decimal plus a count, from public and private ratings. Public book page at `/books/<work_id>/` with cover (placeholder when missing or when the image fails), details, subjects, ISBNs and "X.X ★ from N ratings" / "No ratings yet"; 404 for unknown IDs. `seed_demo` command loads 15 real books from the bundled `books/data/demo_books.json` plus 4 demo users (password `shelf-demo-2026`) with a mix of saves; it's idempotent, refuses without DEBUG, and makes no network calls. TDD covered three behaviors: the community average, the database rating constraint, and the book page's average display. Also switched the site to DaisyUI's dark theme, converted all website views to class-based views (`SignUpView`, `SavedBooksView`, `BookDetailView`), and added a test for deleting a user. 76 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the TDD recommendation and approved every behavior and test unchanged. For behavior 3 the agent wrote three small tests instead of the skill's one, said so, and the user approved them. The user asked two follow-up questions after manual testing: whether views were class-based (they were mostly functions; the agent recommended keeping functions, but the user chose class-based throughout, and the existing views were converted) and what happens when an account is deleted (not covered in the grill-me; the agent explained the cascade behavior and the username-reuse gap, and the user confirmed it was the intended behavior and asked for a test). Dark mode was a new request outside the plan.
+- **Sideways:** The demo book data was fetched once from Open Library during the build. The first run timed out on the 16th title and wrote nothing, and a retry had its connection reset, so the agent dropped that title, made the fetch script save as it went with retries, and got all 15. Some years in the data are Open Library's own errors (The Great Gatsby 1920, Little Women 1848) and were kept as returned. The migration was regenerated rather than adding a second one when the check constraint was added, since it hadn't been applied anywhere. A scripted test edit silently failed to replace one assertion; the agent caught it on review and fixed it by hand.
+
 ## 2026-11-16 — Implemented Phase 1: project skeleton and accounts
 
 ### Prompts

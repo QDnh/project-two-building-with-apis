@@ -5,7 +5,7 @@ from . import views
 from .forms import SignInForm
 
 urlpatterns = [
-    path("signup/", views.signup, name="signup"),
+    path("signup/", views.SignUpView.as_view(), name="signup"),
     path(
         "login/",
         auth_views.LoginView.as_view(

@@ -1,0 +1,11 @@
+{# A book cover from Open Library, or a placeholder when there's no cover or it fails to load. #}
+{% if book.cover_id %}
+  <img src="{{ book.cover_url_large }}" alt="Cover of {{ book.title }}"
+       class="w-full h-full object-cover" loading="lazy"
+       onerror="this.hidden = true; this.nextElementSibling.hidden = false;">
+{% endif %}
+<div class="w-full h-full flex flex-col items-center justify-center gap-2 bg-base-300 text-base-content/60 p-4 text-center"
+     data-testid="cover-placeholder" {% if book.cover_id %}hidden{% endif %}>
+  <span class="text-4xl" aria-hidden="true">📖</span>
+  <span class="text-sm">No cover available</span>
+</div>

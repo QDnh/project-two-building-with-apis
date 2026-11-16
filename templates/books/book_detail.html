@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }}{% endblock %}
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body sm:flex-row gap-6">
+    <figure class="w-40 sm:w-48 aspect-[2/3] shrink-0 rounded-box overflow-hidden self-center sm:self-start">
+      {% include "books/_cover.html" %}
+    </figure>
+
+    <div class="flex-1 min-w-0 space-y-4">
+      <div>
+        <h1 class="text-2xl font-bold">{{ book.title }}</h1>
+        {% if book.author_list %}
+          <p class="text-lg">by {{ book.author_list|join:", " }}</p>
+        {% else %}
+          <p class="text-base-content/60">Unknown author</p>
+        {% endif %}
+      </div>
+
+      <div data-testid="community-rating">
+        <h2 class="text-sm font-semibold text-base-content/70">Community average</h2>
+        {% if community_rating.count %}
+          <p class="text-xl font-semibold">{{ community_rating.average }} ★ from {{ community_rating.count }} rating{{ community_rating.count|pluralize }}</p>
+        {% else %}
+          <p class="text-base-content/60">No ratings yet</p>
+        {% endif %}
+      </div>
+
+      <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="font-semibold">First published</dt>
+        <dd>{{ book.first_publish_year|default:"Unknown" }}</dd>
+
+        <dt class="font-semibold">Editions</dt>
+        <dd>{{ book.edition_count }}</dd>
+
+        <dt class="font-semibold">ISBNs</dt>
+        <dd class="break-words">{{ book.isbns|join:", "|default:"None listed" }}</dd>
+
+        <dt class="font-semibold">Open Library ID</dt>
+        <dd><code>{{ book.work_id }}</code></dd>
+      </dl>
+
+      {% if book.subjects %}
+        <div>
+          <h2 class="font-semibold text-sm mb-2">Subjects</h2>
+          <div class="flex flex-wrap gap-2">
+            {% for subject in book.subjects %}
+              <span class="badge badge-outline">{{ subject }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

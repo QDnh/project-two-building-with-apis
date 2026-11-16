@@ -179,3 +179,9 @@ def test_base_layout_loads_local_css_and_htmx(client):
     assert "/static/css/tailwind.css" in html
     assert "/static/django_htmx/htmx-2.min.js" in html
     assert "cdn" not in html.lower()
+
+
+def test_site_uses_the_dark_theme(client):
+    html = client.get(reverse("home")).content.decode()
+
+    assert '<html lang="en" data-theme="dark">' in html

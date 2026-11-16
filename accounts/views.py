@@ -1,22 +1,25 @@
 from django.conf import settings
 from django.contrib.auth import login
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
+from django.urls import reverse_lazy
+from django.views.generic import CreateView
 
 from .forms import SignUpForm
 
 
-def signup(request):
+class SignUpView(CreateView):
     """Create an account and sign the new user straight in."""
-    if request.user.is_authenticated:
-        return redirect(settings.LOGIN_REDIRECT_URL)
 
-    if request.method == "POST":
-        form = SignUpForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
+    form_class = SignUpForm
+    template_name = "accounts/signup.html"
+    success_url = reverse_lazy(settings.LOGIN_REDIRECT_URL)
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
             return redirect(settings.LOGIN_REDIRECT_URL)
-    else:
-        form = SignUpForm()
+        return super().dispatch(request, *args, **kwargs)
 
-    return render(request, "accounts/signup.html", {"form": form})
+    def form_valid(self, form):
+        response = super().form_valid(form)  # saves the user as self.object
+        login(self.request, self.object)
+        return response
