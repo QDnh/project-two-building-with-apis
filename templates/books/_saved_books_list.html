@@ -1,7 +1,7 @@
-{# The Saved Books list area: the card grid with pagination, or the empty state. #}
+{# The Saved Books list area: the card grid with pagination, or an empty state. #}
 {% if saves %}
   <p class="text-sm text-base-content/70" data-testid="saves-summary">
-    {{ total_saves }} saved book{{ total_saves|pluralize }}
+    {{ total_saves }} saved book{{ total_saves|pluralize }}{% if is_filtered %} match{{ total_saves|pluralize:"es," }} these filters{% endif %}
   </p>
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
     {% for save in saves %}
@@ -9,6 +9,15 @@
     {% endfor %}
   </div>
   {% include "_pagination.html" with target="#saved-books-list" %}
+{% elif has_any_saves %}
+  <div class="card bg-base-100 shadow-sm border border-base-300" data-testid="no-matches">
+    <div class="card-body items-center text-center">
+      <span class="text-4xl" aria-hidden="true">🔍</span>
+      <p>No saved books match these filters.</p>
+      {# A full page load, so the toolbar resets along with the list. #}
+      <a href="{% url 'books:saved_books' %}" class="btn btn-sm" data-testid="clear-filters">Clear filters</a>
+    </div>
+  </div>
 {% else %}
   <div class="card bg-base-100 shadow-sm border border-base-300" data-testid="no-saves">
     <div class="card-body items-center text-center">

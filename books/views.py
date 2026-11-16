@@ -201,12 +201,17 @@ class SaveBookView(LoginRequiredMixin, View):
 
 
 class SavedBooksView(LoginRequiredMixin, HtmxPartialMixin, TemplateView):
-    """Saved Books: the signed-in user's own saves, newest first.
+    """Saved Books: the signed-in user's own saves.
 
     Built only from the local database, so it keeps working when Open Library
-    is down. Shows PER_PAGE saves per page with the page number in the URL; an
-    invalid or out-of-range page shows the nearest real page instead of an
-    error. HTMX requests from the pagination buttons get only the list partial.
+    is down. Search, filters and sort come from the URL and are applied by
+    `services.filter_saved_books`, which holds every list rule. Shows PER_PAGE
+    saves per page; an invalid or out-of-range page shows the nearest real
+    page instead of an error.
+
+    HTMX requests from the toolbar and pagination get only the list partial,
+    and the HX-Push-Url header puts the tidy URL for the current settings
+    (without empty or invalid values) in the address bar.
     """
 
     template_name = "books/saved_books.html"
@@ -215,24 +220,47 @@ class SavedBooksView(LoginRequiredMixin, HtmxPartialMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        saves = (
-            SavedBook.objects.filter(user=self.request.user)
-            .select_related("book")
-            .order_by("-saved_at", "-pk")
+        own_saves = SavedBook.objects.filter(user=self.request.user)
+        result = services.filter_saved_books(
+            own_saves.select_related("book"), self.request.GET
         )
-        paginator = Paginator(saves, self.PER_PAGE)
+        filters = result.filters
+        paginator = Paginator(result.saves, self.PER_PAGE)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         page = page_obj.number
         path = self.request.path
+        query = urlencode({**filters, "page": page} if page > 1 else filters)
+        self.current_url = f"{path}?{query}" if query else path
         context.update(
             saves=page_obj.object_list,
             total_saves=paginator.count,
+            # Tells "no saves yet" apart from "nothing matches these filters".
+            has_any_saves=bool(paginator.count) or own_saves.exists(),
+            filters=filters,
+            is_filtered=any(key != "sort" for key in filters),
+            status_choices=SavedBook.Status.choices,
+            rating_choices=[(str(n), "★" * n) for n in range(5, 0, -1)],
+            sort_choices=[
+                (key, label) for key, (label, _) in services.SAVED_BOOK_SORTS.items()
+            ],
+            default_sort=services.DEFAULT_SORT,
             page=page,
             num_pages=paginator.num_pages,
-            prev_url=page_url(path, {}, page - 1) if page_obj.has_previous() else None,
-            next_url=page_url(path, {}, page + 1) if page_obj.has_next() else None,
+            prev_url=(
+                page_url(path, filters, page - 1) if page_obj.has_previous() else None
+            ),
+            next_url=(
+                page_url(path, filters, page + 1) if page_obj.has_next() else None
+            ),
         )
         return context
+
+    def render_to_response(self, context, **response_kwargs):
+        response = super().render_to_response(context, **response_kwargs)
+        htmx = self.request.htmx
+        if htmx and not htmx.history_restore_request:
+            response["HX-Push-Url"] = self.current_url
+        return response
 
 
 class BookDetailView(DetailView):

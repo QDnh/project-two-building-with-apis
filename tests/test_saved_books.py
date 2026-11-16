@@ -210,3 +210,169 @@ def test_htmx_history_restore_gets_the_full_page(signed_in, reader):
     html = response.content.decode()
     assert "<html" in html
     assert 'id="saved-books-list"' in html
+
+
+# --- Search, filters and sort (Phase 7) ---------------------------------------
+
+
+def test_filters_in_the_url_narrow_the_list(signed_in, reader):
+    SavedBook.objects.create(
+        user=reader, book=make_book(1, authors="Ursula K. Le Guin"), rating=5
+    )
+    SavedBook.objects.create(
+        user=reader, book=make_book(2, authors="Ursula K. Le Guin"), rating=None
+    )
+    SavedBook.objects.create(user=reader, book=make_book(3), rating=5)
+
+    html = get_html(signed_in, q="le guin", rating="5")
+
+    assert titles(html) == ["Book 1"]
+    assert "1 saved book matches these filters" in html
+
+
+def test_toolbar_shows_the_current_settings(signed_in, reader):
+    SavedBook.objects.create(user=reader, book=make_book(1))
+
+    html = get_html(
+        signed_in,
+        q="dune",
+        status="reading",
+        rating="unrated",
+        visibility="private",
+        sort="year",
+    )
+
+    assert 'data-testid="filter-toolbar"' in html
+    assert 'name="q" value="dune"' in html
+    assert '<option value="reading" selected>' in html
+    assert '<option value="unrated" selected>' in html
+    assert '<option value="private" selected>' in html
+    assert '<option value="year" selected>' in html
+
+    clear = re.search(
+        r'<a href="([^"]+)"[^>]*data-testid="clear-filters-toolbar"', html
+    )
+    assert clear and clear.group(1) == URL
+
+
+def test_toolbar_defaults_to_recently_saved(signed_in, reader):
+    SavedBook.objects.create(user=reader, book=make_book(1))
+
+    html = get_html(signed_in)
+
+    assert '<option value="-saved" selected>' in html
+
+
+def test_sort_from_the_url_orders_the_list(signed_in, reader):
+    SavedBook.objects.create(user=reader, book=make_book(1), rating=2)
+    SavedBook.objects.create(user=reader, book=make_book(2), rating=5)
+    SavedBook.objects.create(user=reader, book=make_book(3))
+
+    assert titles(get_html(signed_in, sort="-rating")) == [
+        "Book 2",
+        "Book 1",
+        "Book 3",
+    ]
+
+
+def test_invalid_values_in_the_url_show_the_normal_list(signed_in, reader):
+    save_many(reader, 2)
+
+    html = get_html(
+        signed_in, status="bogus", rating="abc", visibility="x", sort="nope"
+    )
+
+    assert titles(html) == ["Book 2", "Book 1"]
+    assert '<option value="" selected>' not in html  # nothing junk is selected
+    assert '<option value="-saved" selected>' in html
+
+
+def test_pagination_links_keep_the_current_settings(signed_in, reader):
+    save_many(reader, 13)
+
+    html = get_html(signed_in, q="book", sort="title", status="", page="1")
+
+    assert f'href="{URL}?q=book&amp;sort=title&amp;page=2"' in html
+
+
+def test_htmx_filter_request_returns_the_list_and_pushes_a_tidy_url(signed_in, reader):
+    SavedBook.objects.create(user=reader, book=make_book(1), is_public=True)
+    SavedBook.objects.create(user=reader, book=make_book(2))
+
+    # A toolbar submit sends every field, including the empty ones.
+    response = signed_in.get(
+        URL,
+        {"q": "", "status": "", "rating": "", "visibility": "public", "sort": "-saved"},
+        HTTP_HX_REQUEST="true",
+    )
+
+    html = response.content.decode()
+    assert "<html" not in html
+    assert 'data-testid="filter-toolbar"' not in html
+    assert titles(html) == ["Book 1"]
+    assert response.headers["HX-Push-Url"] == f"{URL}?visibility=public"
+
+
+def test_htmx_paging_pushes_the_page_with_the_settings(signed_in, reader):
+    save_many(reader, 13)
+
+    response = signed_in.get(
+        URL, {"sort": "title", "page": "2"}, HTTP_HX_REQUEST="true"
+    )
+
+    assert response.headers["HX-Push-Url"] == f"{URL}?sort=title&page=2"
+
+
+def test_htmx_request_with_no_settings_pushes_the_bare_url(signed_in, reader):
+    response = signed_in.get(URL, {"status": ""}, HTTP_HX_REQUEST="true")
+
+    assert response.headers["HX-Push-Url"] == URL
+
+
+def test_full_page_and_history_restore_do_not_push_a_url(signed_in):
+    full = signed_in.get(URL, {"status": "read"})
+    restore = signed_in.get(
+        URL,
+        {"status": "read"},
+        HTTP_HX_REQUEST="true",
+        HTTP_HX_HISTORY_RESTORE_REQUEST="true",
+    )
+
+    assert "HX-Push-Url" not in full.headers
+    assert "HX-Push-Url" not in restore.headers
+
+
+def test_no_matches_shows_a_clear_filters_link(signed_in, reader):
+    SavedBook.objects.create(user=reader, book=make_book(1))
+
+    html = get_html(signed_in, status="read")
+
+    assert 'data-testid="no-matches"' in html
+    assert "No saved books match these filters." in html
+    assert re.search(rf'href="{URL}"[^>]*data-testid="clear-filters"', html), (
+        "clear-filters link should point at the unfiltered list"
+    )
+    assert 'data-testid="no-saves"' not in html
+
+
+def test_no_matches_htmx_partial_also_has_the_clear_link(signed_in, reader):
+    SavedBook.objects.create(user=reader, book=make_book(1))
+
+    response = signed_in.get(URL, {"q": "zzz"}, HTTP_HX_REQUEST="true")
+
+    assert 'data-testid="clear-filters"' in response.content.decode()
+
+
+def test_user_with_no_saves_sees_the_empty_state_even_with_filters(signed_in):
+    html = get_html(signed_in, status="read")
+
+    assert 'data-testid="no-saves"' in html
+    assert 'data-testid="no-matches"' not in html
+
+
+def test_toolbar_always_has_a_clear_filters_link(signed_in):
+    # HTMX swaps only the list, so the toolbar can't show or hide this as
+    # filters change; it's always there and always resets to the bare list.
+    html = get_html(signed_in)
+
+    assert re.search(rf'<a href="{URL}"[^>]*data-testid="clear-filters-toolbar"', html)

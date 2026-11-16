@@ -28,6 +28,26 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 7: Saved Books search, filters and sort
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 7`
+2. (Answer to "run the /tdd skill?") Yes, run /tdd (Recommended)
+3. yes, go ahead. Conduct each test by confirming it goes red, making it green, and pausing to give me the details after each of the three.
+4. I think that is right. Making it pass.
+5. yes, move on to behaviour 2. Blitz through the other two. Red, then green, and pause to give me the details after each.
+6. yes, move on to behaviour 3
+7. yes, continue with the rest of Phase 7
+8. Problem. Only Read status updates the list.
+9. Is there meant to be a Clear Filter button beside the tabs?
+10. Works and looks good.
+11. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 7. A new `services.filter_saved_books(saves, params)` holds every Saved Books list rule: search on title or author (case-insensitive, trimmed); status, rating (1–5 or "unrated") and visibility filters; and four sorts from a `SAVED_BOOK_SORTS` table: recently saved (default), title A–Z, first published (unknown years last), and my rating (unrated last). Ties fall back to title, then `-pk`, so paging is stable. Invalid values are ignored, and the function returns `filters`, holding only the settings that applied. `SavedBooksView` uses it, keeps the settings in the Previous/Next links, and sends an `HX-Push-Url` header with a tidy URL (no empty or invalid values) on HTMX requests. A filter toolbar card (search box, four dropdowns, an always-visible Clear filters link, and a no-JavaScript Apply button) swaps only the list. When filters match nothing, a "No saved books match these filters." state shows a Clear filters link; users with no saves still see the original empty state. The three TDD behaviours were search on title or author, the rating sort with unrated saves last, and invalid values being ignored while valid ones still apply. A new `tests/test_saved_books_filters.py` and 14 new view tests in `tests/test_saved_books.py` were added. 205 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the TDD recommendation and the three proposed behaviours. They asked to pause after the first RED, then for behaviours 2 and 3 to go straight from red to green, pausing only after each GREEN. They asked one follow-up question: whether there should be a Clear filters button beside the dropdowns. Making Clear filters a full page load (so the toolbar resets too) was the agent's call.
+- **Sideways:** In behaviour 3's RED, the all-junk case passed from the start (code that reads no parameters trivially ignores junk), so the test was built around junk values mixed with valid ones, and those cases failed. The user found that only the Status dropdown updated the list: the toolbar's `change from:find select` trigger matched only the first `<select>`, because htmx's `find` returns one element. It now uses `change[target.tagName=='SELECT']`. The server-side tests couldn't catch this because they don't run htmx. The user also found that the toolbar's Clear filters link was missing: it was rendered only on a full page load with filters set, which never happens after HTMX filtering. It is now always shown, as in the prototype, and its tests were updated.
+
 ## 2026-11-16 — Implemented Phase 6: Saved Books list
 
 ### Prompts

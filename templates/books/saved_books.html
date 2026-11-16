@@ -4,6 +4,54 @@
 <h1 class="text-2xl font-bold">Saved Books</h1>
 <p class="text-base-content/70 mt-1">Your personal reading list. Only you can see books you haven't made public.</p>
 
+{% comment %}
+Filter toolbar. Changing any dropdown (a `change` bubbling up from a
+<select>; "from:find select" would only match the first one), typing in the search box (after a short
+pause) or pressing Enter swaps only the list below; the response's
+HX-Push-Url header updates the address bar. Without JavaScript the form
+submits as a normal GET. "Clear filters" is always shown and is a plain link
+so the toolbar resets too.
+{% endcomment %}
+<div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
+  <div class="card-body p-4">
+    <form method="get" action="{% url 'books:saved_books' %}" role="search" data-testid="filter-toolbar"
+          hx-get="{% url 'books:saved_books' %}" hx-target="#saved-books-list" hx-sync="this:replace"
+          hx-trigger="submit, change[target.tagName=='SELECT'], input changed delay:400ms from:#saved-books-q, search from:#saved-books-q"
+          class="flex flex-wrap items-center gap-2">
+      <label class="input input-sm w-full sm:w-64">
+        <span class="sr-only">Search title or author</span>
+        <input type="search" id="saved-books-q" name="q" value="{{ filters.q|default:'' }}" placeholder="Search title or author" class="grow">
+      </label>
+      <select name="status" class="select select-sm w-auto" aria-label="Status">
+        <option value="">All statuses</option>
+        {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="rating" class="select select-sm w-auto" aria-label="My rating">
+        <option value="">Any rating</option>
+        {% for value, label in rating_choices %}
+          <option value="{{ value }}" {% if filters.rating == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+        <option value="unrated" {% if filters.rating == "unrated" %}selected{% endif %}>Unrated</option>
+      </select>
+      <select name="visibility" class="select select-sm w-auto" aria-label="Visibility">
+        <option value="">Public &amp; private</option>
+        <option value="public" {% if filters.visibility == "public" %}selected{% endif %}>Public only</option>
+        <option value="private" {% if filters.visibility == "private" %}selected{% endif %}>Private only</option>
+      </select>
+      <select name="sort" class="select select-sm w-auto" aria-label="Sort">
+        {% for value, label in sort_choices %}
+          <option value="{{ value }}" {% if filters.sort|default:default_sort == value %}selected{% endif %}>Sort: {{ label }}</option>
+        {% endfor %}
+      </select>
+      <noscript><button type="submit" class="btn btn-sm btn-primary">Apply</button></noscript>
+      {# Always shown: HTMX swaps only the list, so the toolbar can't track whether filters are set. #}
+      <a href="{% url 'books:saved_books' %}" class="btn btn-sm btn-ghost" data-testid="clear-filters-toolbar">Clear filters</a>
+    </form>
+  </div>
+</div>
+
 <div id="saved-books-list" class="mt-4">
   {% include "books/_saved_books_list.html" %}
 </div>

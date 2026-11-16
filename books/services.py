@@ -1,8 +1,11 @@
 """Shared book logic used by both the website and the API."""
 
 import re
+from typing import NamedTuple
 
 from django.db import IntegrityError, transaction
+from django.db.models import F, Q, QuerySet
+from django.db.models.functions import Lower
 
 from . import openlibrary
 from .models import AUTHOR_SEPARATOR, WORK_ID_PATTERN, Book, SavedBook
@@ -49,6 +52,90 @@ def save_book(user, work_id):
     except IntegrityError:
         # Saved twice at the same moment (e.g. a double click).
         raise AlreadySaved(SavedBook.objects.get(user=user, book=book)) from None
+
+
+# Saved Books filter values accepted from the URL; anything else is ignored.
+UNRATED = "unrated"
+RATING_VALUES = {"1", "2", "3", "4", "5"}
+VISIBILITY_VALUES = {"public", "private"}
+
+# Saved Books sort options: URL value → (label, ordering). Ties fall back to a
+# stable order so paging never shows a save twice or skips one.
+DEFAULT_SORT = "-saved"
+SAVED_BOOK_SORTS = {
+    "-saved": ("Recently saved", ["-saved_at", "-pk"]),
+    "title": ("Title A–Z", [Lower("book__title"), "-pk"]),
+    "year": (
+        "First published",
+        [
+            F("book__first_publish_year").asc(nulls_last=True),
+            Lower("book__title"),
+            "-pk",
+        ],
+    ),
+    "-rating": (
+        "My rating",
+        [F("rating").desc(nulls_last=True), Lower("book__title"), "-pk"],
+    ),
+}
+
+
+class FilteredSaves(NamedTuple):
+    """Saves after search, filters and sort, plus the settings that applied."""
+
+    saves: QuerySet
+    filters: dict
+
+
+def filter_saved_books(saves, params):
+    """Apply Saved Books search, filters and sort from the query parameters.
+
+    Every Saved Books list rule lives here. `params` is `request.GET` or any
+    dict of strings:
+      q           title or author contains this text, ignoring case
+      status      one of SavedBook.Status
+      rating      "1"–"5", or "unrated"
+      visibility  "public" or "private"
+      sort        a key of SAVED_BOOK_SORTS (default: recently saved)
+
+    Missing, empty or invalid values are ignored, never an error. Returns the
+    filtered, sorted saves plus `filters`: only the settings that applied, in
+    a fixed order, for building URLs and showing the toolbar.
+    """
+    filters = {}
+    query = (params.get("q") or "").strip()
+    if query:
+        filters["q"] = query
+        saves = saves.filter(
+            Q(book__title__icontains=query) | Q(book__authors__icontains=query)
+        )
+
+    status = params.get("status")
+    if status in SavedBook.Status.values:
+        filters["status"] = status
+        saves = saves.filter(status=status)
+
+    rating = params.get("rating")
+    if rating == UNRATED:
+        filters["rating"] = rating
+        saves = saves.filter(rating__isnull=True)
+    elif rating in RATING_VALUES:
+        filters["rating"] = rating
+        saves = saves.filter(rating=int(rating))
+
+    visibility = params.get("visibility")
+    if visibility in VISIBILITY_VALUES:
+        filters["visibility"] = visibility
+        saves = saves.filter(is_public=visibility == "public")
+
+    sort = params.get("sort")
+    if sort in SAVED_BOOK_SORTS and sort != DEFAULT_SORT:
+        filters["sort"] = sort
+    else:
+        sort = DEFAULT_SORT
+    return FilteredSaves(
+        saves=saves.order_by(*SAVED_BOOK_SORTS[sort][1]), filters=filters
+    )
 
 
 def create_book_from_open_library(work_id):
