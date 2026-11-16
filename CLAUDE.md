@@ -25,6 +25,8 @@ A Django web app and REST API where users search Open Library, save books to a p
 - Templates live in the top-level `templates/` folder; `base.html` holds the navbar.
 - The site uses DaisyUI's dark theme (set in `base.html`); style with DaisyUI's theme colours (`bg-base-100`, `text-base-content`, …), not fixed colours.
 - Website views are class-based (Django generic views and mixins); the API uses DRF's class-based views and viewsets.
+- Shared pagination lives in `templates/_pagination.html` (Previous / "Page X of Y" / Next); pass `page`, `num_pages`, `prev_url`, `next_url` and the HTMX `target`.
+- HTMX views return only the partial for HTMX requests, but the full page for history-restore requests (`request.htmx.history_restore_request`), so back/refresh work.
 - Tests live in the top-level `tests/` folder. An autouse fixture in `tests/conftest.py` fails any test that opens a real network connection.
 
 ## Architecture decisions
