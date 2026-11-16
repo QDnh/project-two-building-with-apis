@@ -28,6 +28,23 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 8: Card quick edits
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 8`
+2. (Answer to "run the /tdd skill?") Yes, use /tdd (Recommended)
+3. Seems right. Do it. Blitz through them. Check they are red, make them green, and pause after each to give me details.
+4. yes, go to behaviour 2
+5. yes, go to behaviour 3
+6. yes, go ahead with the rest of the phase
+7. continue
+8. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 8. A new `services.update_saved_book(save, data)` is the one place save edits are validated. It applies any subset of status, rating (empty or `None` clears it) and `is_public`, accepts both form strings and JSON-style values for reuse by the book page and the API, and checks every value before changing anything. If any value is invalid, it raises `InvalidUpdate` with a message per field and saves nothing. `UpdateSavedBookView` (`POST /saved/<pk>/edit/`) looks the save up by owner, so another user's save is a 404 like a missing one. For HTMX requests it returns only that card with a fading "Saved ✓", the errors, or a "No longer matches your filters" hint. The hint comes from running the posted list URL's filters through the existing `filter_saved_books` against just the edited save. Without JavaScript, it redirects back to that list URL with a message. A shared `safe_next_url` helper now does the return-link check for both this view and the Save button. The card has five star buttons, a ✕ to clear the rating, a status dropdown and a Public toggle (a hidden `is_public=false` before the checkbox, so unticking still sends a value), all in one form that swaps only that card. The three TDD behaviours were: a partial update changes only the fields sent, an invalid value rejects the whole update, and an edited card that no longer matches the filters comes back with the hint. A new `tests/test_card_edits.py` and `tests/test_update_saved_book_service.py` were added. 236 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the TDD recommendation and the three proposed behaviours without changes. They asked to go straight from red to green and pause only after each GREEN, not after each RED. No follow-up questions were asked, and manual browser checks raised no problems.
+- **Sideways:** Two Phase 6 assertions (the read-only status badge and the "★★★★☆" text) were rewritten to check the new controls, because the badges became working controls. Writing the test helper that counts lit stars took three tries: a `\b` written through a Python script became a literal backspace character, a shell `sed` then dropped the backslash, and `\b` also matched the unlit stars' `hover:text-warning` class. It was fixed with the Edit tool and `\s`. Because the full test suite takes over two minutes, the first run was moved to the background.
+
 ## 2026-11-16 — Implemented Phase 7: Saved Books search, filters and sort
 
 ### Prompts

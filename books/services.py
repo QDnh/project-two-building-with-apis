@@ -54,6 +54,61 @@ def save_book(user, work_id):
         raise AlreadySaved(SavedBook.objects.get(user=user, book=book)) from None
 
 
+# Fields an owner can edit on a save, as the website and the API send them.
+EDITABLE_FIELDS = ("status", "rating", "is_public")
+
+
+class InvalidUpdate(ValueError):
+    """One or more edited values are invalid; nothing was saved."""
+
+    def __init__(self, errors):
+        super().__init__("; ".join(errors.values()))
+        self.errors = errors
+
+
+TRUE_VALUES = {True, "true", "on", "1"}
+FALSE_VALUES = {False, "false", "off", "0"}
+
+
+def update_saved_book(save, data):
+    """Apply any subset of status, rating and is_public from `data` to `save`.
+
+    `data` is a form's POST data or any dict. Only keys present in `data`
+    change; an empty or None rating clears it ("Not rated"). Every value is
+    checked before anything changes: if any is invalid, InvalidUpdate is
+    raised with an error per field and the save is left exactly as it was.
+    Returns the save.
+    """
+    changes, errors = {}, {}
+    if "status" in data:
+        status = data["status"]
+        if status in SavedBook.Status.values:
+            changes["status"] = status
+        else:
+            errors["status"] = "Choose Want to read, Reading or Read."
+    if "rating" in data:
+        rating = data["rating"]
+        if rating in ("", None):
+            changes["rating"] = None
+        elif str(rating) in RATING_VALUES:
+            changes["rating"] = int(rating)
+        else:
+            errors["rating"] = "Rating must be a whole number of stars from 1 to 5."
+    if "is_public" in data:
+        value = data["is_public"]
+        if value in TRUE_VALUES or value in FALSE_VALUES:
+            changes["is_public"] = value in TRUE_VALUES
+        else:
+            errors["is_public"] = "Choose public or private."
+    if errors:
+        raise InvalidUpdate(errors)
+    for field, value in changes.items():
+        setattr(save, field, value)
+    if changes:
+        save.save(update_fields=list(changes))
+    return save
+
+
 # Saved Books filter values accepted from the URL; anything else is ignored.
 UNRATED = "unrated"
 RATING_VALUES = {"1", "2", "3", "4", "5"}

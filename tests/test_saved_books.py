@@ -67,6 +67,11 @@ def titles(html):
     return re.findall(r'class="link link-hover">([^<]+)</a>', html)
 
 
+def lit_stars(html):
+    """How many of the card's star buttons are filled in."""
+    return len(re.findall(r'class="[^"]*\stext-warning"[^>]*data-testid="star-', html))
+
+
 def get_html(client, **params):
     response = client.get(URL, params)
     assert response.status_code == 200
@@ -114,9 +119,9 @@ def test_card_shows_book_details_rating_status_and_visibility(signed_in, reader)
 
     assert f'href="{book.get_absolute_url()}"' in html
     assert "Frank Herbert, Brian Herbert · 1965" in html
-    assert "★★★★☆" in html
     assert "Rated 4 out of 5" in html
-    assert re.search(r'data-testid="status">\s*Reading\s*<', html)
+    assert lit_stars(html) == 4
+    assert re.search(r'<option value="reading" selected>Reading<', html)
     assert re.search(r'data-testid="visibility">\s*Public\s*<', html)
 
 
@@ -126,7 +131,8 @@ def test_unrated_private_save_says_so(signed_in, reader):
     html = get_html(signed_in)
 
     assert "Not rated" in html
-    assert re.search(r'data-testid="status">\s*Want to read\s*<', html)
+    assert lit_stars(html) == 0
+    assert re.search(r'<option value="want_to_read" selected>Want to read<', html)
     assert re.search(r'data-testid="visibility">\s*Private\s*<', html)
     assert 'data-testid="cover-placeholder"' in html
 

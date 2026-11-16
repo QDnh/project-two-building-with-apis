@@ -1,12 +1,26 @@
 {% comment %}
-One Saved Books card (Shelf grid): cover, title, authors, year, the user's
-rating and status, and whether the save is public.
+One Saved Books card (Shelf grid): cover, title, authors, year, and quick
+controls for the user's rating (1–5 stars, ✕ to clear), status and sharing.
 
 Include with:
-  save   the user's SavedBook (with its book)
+  save         the user's SavedBook (with its book)
+  list_url     the Saved Books URL the card is shown on (filters and page),
+               so the update view can tell whether the edited card still
+               matches and where to return without JavaScript
+After an edit, the update view also passes:
+  just_saved   show a brief "Saved ✓"
+  stale        the card no longer matches the list's filters
+  edit_errors  per-field messages when the edit was rejected
+
+Every control posts the one form to the update view. With HTMX, a star or ✕
+click (a submit button) or a change to the status or Public toggle swaps
+only this card. Without JavaScript, the stars and ✕ submit normally and a
+Save button appears for the other controls. The hidden is_public=false before
+the checkbox means an unticked toggle still sends "false" (the checkbox's
+"true" comes last and wins when ticked).
 {% endcomment %}
 {% with book=save.book %}
-<div class="card bg-base-100 shadow-sm border border-base-300" data-testid="saved-book">
+<div id="saved-book-{{ save.pk }}" class="card bg-base-100 shadow-sm border border-base-300" data-testid="saved-book">
   <a href="{{ book.get_absolute_url }}" class="block">
     <figure class="aspect-[2/3] rounded-t-box overflow-hidden">
       {% include "books/_cover.html" %}
@@ -19,22 +33,57 @@ Include with:
     <p class="text-xs text-base-content/70">
       {{ book.author_list|join:", "|default:"Unknown author" }} · {{ book.first_publish_year|default:"Year unknown" }}
     </p>
-    <p class="text-sm" data-testid="rating">
-      {% if save.rating %}
-        <span class="text-warning" aria-hidden="true">{% for i in "12345" %}{% if forloop.counter <= save.rating %}★{% else %}☆{% endif %}{% endfor %}</span>
-        <span class="sr-only">Rated {{ save.rating }} out of 5</span>
-      {% else %}
-        <span class="text-base-content/60">Not rated</span>
-      {% endif %}
-    </p>
-    <div class="flex flex-wrap gap-1 mt-auto pt-2">
-      <span class="badge badge-sm badge-primary badge-soft" data-testid="status">{{ save.get_status_display }}</span>
-      {% if save.is_public %}
-        <span class="badge badge-sm badge-success badge-soft" data-testid="visibility">Public</span>
-      {% else %}
-        <span class="badge badge-sm badge-ghost" data-testid="visibility">Private</span>
-      {% endif %}
-    </div>
+
+    <form method="post" action="{% url 'books:update_saved_book' save.pk %}" data-testid="card-edit-form"
+          hx-post="{% url 'books:update_saved_book' save.pk %}" hx-trigger="submit, change"
+          hx-target="#saved-book-{{ save.pk }}" hx-swap="outerHTML" hx-sync="this:drop"
+          class="flex flex-col gap-2 mt-1">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ list_url }}">
+
+      <div class="flex items-center gap-1" data-testid="rating">
+        <span class="sr-only">{% if save.rating %}Rated {{ save.rating }} out of 5{% else %}Not rated{% endif %}</span>
+        {% for value in "12345" %}
+          <button type="submit" name="rating" value="{{ value }}"
+                  class="text-lg leading-none cursor-pointer {% if save.rating and forloop.counter <= save.rating %}text-warning{% else %}text-base-content/30 hover:text-warning{% endif %}"
+                  aria-label="Rate {{ value }} star{{ forloop.counter|pluralize }}" data-testid="star-{{ value }}">★</button>
+        {% endfor %}
+        {% if save.rating %}
+          <button type="submit" name="rating" value="" class="btn btn-ghost btn-xs px-1 ml-1"
+                  aria-label="Clear rating" title="Clear rating" data-testid="clear-rating">✕</button>
+        {% else %}
+          <span class="text-xs text-base-content/60 ml-1" aria-hidden="true">Not rated</span>
+        {% endif %}
+      </div>
+
+      <select name="status" class="select select-xs w-full" aria-label="Status" data-testid="status">
+        {% for value, label in save.Status.choices %}
+          <option value="{{ value }}" {% if save.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="flex items-center gap-2 text-xs cursor-pointer">
+        <input type="hidden" name="is_public" value="false">
+        <input type="checkbox" name="is_public" value="true" class="toggle toggle-xs toggle-primary"
+               {% if save.is_public %}checked{% endif %}>
+        <span data-testid="visibility">{% if save.is_public %}Public{% else %}Private{% endif %}</span>
+      </label>
+
+      <noscript><button type="submit" class="btn btn-xs btn-primary">Save</button></noscript>
+    </form>
+
+    {% if just_saved %}
+      {# Shown at full strength while HTMX settles the swap, then fades out. #}
+      <p role="status" class="text-xs font-medium text-success opacity-0 transition-opacity duration-1000 delay-1000 [.htmx-added_&]:opacity-100" data-testid="saved-flash">Saved ✓</p>
+    {% endif %}
+    {% if edit_errors %}
+      <div role="alert" class="alert alert-error alert-soft text-xs p-2" data-testid="edit-errors">
+        <span>{% for message in edit_errors.values %}{{ message }}{% if not forloop.last %} {% endif %}{% endfor %} Nothing was changed.</span>
+      </div>
+    {% endif %}
+    {% if stale %}
+      <p class="text-xs text-warning" data-testid="stale-hint">No longer matches your filters; it leaves the list when you change filters or pages.</p>
+    {% endif %}
   </div>
 </div>
 {% endwith %}

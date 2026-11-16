@@ -1,11 +1,11 @@
 import logging
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
-from django.http import Http404
-from django.shortcuts import redirect, render
+from django.http import Http404, QueryDict
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.cache import patch_vary_headers
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -190,14 +190,7 @@ class SaveBookView(LoginRequiredMixin, View):
     def get_next_url(self, work_id):
         """Where a no-JavaScript save returns to: the posted `next` if it's a
         page on this site, otherwise Search Catalog."""
-        next_url = self.request.POST.get("next", "")
-        if url_has_allowed_host_and_scheme(
-            next_url,
-            allowed_hosts={self.request.get_host()},
-            require_https=self.request.is_secure(),
-        ):
-            return next_url
-        return reverse("books:search_catalog")
+        return safe_next_url(self.request, reverse("books:search_catalog"))
 
 
 class SavedBooksView(LoginRequiredMixin, HtmxPartialMixin, TemplateView):
@@ -232,6 +225,8 @@ class SavedBooksView(LoginRequiredMixin, HtmxPartialMixin, TemplateView):
         query = urlencode({**filters, "page": page} if page > 1 else filters)
         self.current_url = f"{path}?{query}" if query else path
         context.update(
+            # Cards post this back, so an edit knows the list's filters.
+            list_url=self.current_url,
             saves=page_obj.object_list,
             total_saves=paginator.count,
             # Tells "no saves yet" apart from "nothing matches these filters".
@@ -261,6 +256,60 @@ class SavedBooksView(LoginRequiredMixin, HtmxPartialMixin, TemplateView):
         if htmx and not htmx.history_restore_request:
             response["HX-Push-Url"] = self.current_url
         return response
+
+
+def safe_next_url(request, default):
+    """The posted `next` if it's a page on this site, otherwise `default`."""
+    next_url = request.POST.get("next", "")
+    if url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return default
+
+
+class UpdateSavedBookView(LoginRequiredMixin, View):
+    """Edit the signed-in user's own save from its Saved Books card.
+
+    Accepts any subset of status, rating (empty clears it) and is_public;
+    `services.update_saved_book` validates them all before saving anything.
+    Someone else's save is a 404, exactly like one that doesn't exist.
+
+    HTMX requests get only the updated card back, with "Saved ✓" or the
+    errors. The list isn't re-filtered: if the edited save no longer matches
+    the filters of the list it was edited on (the posted `next` URL), the card
+    stays with a hint until the filters or page change. Without JavaScript,
+    the user is redirected back to that list with a message.
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request, pk):
+        save = get_object_or_404(
+            SavedBook.objects.select_related("book"), pk=pk, user=request.user
+        )
+        list_url = safe_next_url(request, reverse("books:saved_books"))
+        context = {"save": save, "list_url": list_url}
+        try:
+            services.update_saved_book(save, request.POST)
+        except services.InvalidUpdate as error:
+            context["edit_errors"] = error.errors
+            message_level = messages.ERROR
+            message = f"{error} Nothing was changed."
+        else:
+            filters = QueryDict(urlsplit(list_url).query)
+            context["just_saved"] = True
+            context["stale"] = not services.filter_saved_books(
+                SavedBook.objects.filter(pk=save.pk), filters
+            ).saves.exists()
+            message_level, message = messages.SUCCESS, f"Saved “{save.book.title}”."
+
+        if request.htmx:
+            return render(request, "books/_saved_book_card.html", context)
+        messages.add_message(request, message_level, message)
+        return redirect(list_url)
 
 
 class BookDetailView(DetailView):
