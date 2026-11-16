@@ -10,8 +10,8 @@
   </div>
 {% elif search_page %}
   {% if search_page.results %}
-    <p class="text-sm text-base-content/70">
-      Showing {{ search_page.results|length }} of {{ search_page.total|intcomma }} match{{ search_page.total|pluralize:"es" }} for “{{ query }}”
+    <p class="text-sm text-base-content/70" data-testid="results-summary">
+      Showing {{ first_index|intcomma }}–{{ last_index|intcomma }} of {{ search_page.total|intcomma }} match{{ search_page.total|pluralize:"es" }} for “{{ query }}”
     </p>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
       {% for book in search_page.results %}
@@ -27,6 +27,19 @@
           </div>
         </div>
       {% endfor %}
+    </div>
+    {% include "_pagination.html" with target="#search-results" %}
+    {% if show_refine_hint %}
+      <div role="note" class="alert alert-info alert-soft mt-4" data-testid="refine-hint">
+        <span aria-hidden="true">💡</span>
+        <span>Search Catalog shows up to {{ view.MAX_PAGES }} pages of results. Not finding it? Try a more specific search, such as adding the author's name or using an ISBN.</span>
+      </div>
+    {% endif %}
+  {% elif page > 1 %}
+    <div class="card bg-base-100 shadow-sm border border-base-300" data-testid="past-last-page">
+      <div class="card-body">
+        <p>There are no more results for “{{ query }}” on page {{ page }}. <a href="{{ first_page_url }}" class="link">Back to the first page</a>.</p>
+      </div>
     </div>
   {% else %}
     <div class="card bg-base-100 shadow-sm border border-base-300">

@@ -28,6 +28,19 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 4: Search paging over HTMX
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 4`
+2. (Answer to "run the /tdd skill?") Skip TDD (Recommended)
+3. Looks good.
+4. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 4. `SearchCatalogView` reads `page` from the URL (invalid or non-positive values mean page 1), caps it at 10 (`MAX_PAGES`), and calls the client with `page` and `limit=20`. It works out the page count from the match total (at most 10), builds Previous/Next URLs that keep the query, and shows a "try a more specific search" hint when the page was capped or page 10 is reached with more matches. HTMX requests get only the results partial; HTMX history-restore requests still get the full page so the back button works. A new shared `templates/_pagination.html` (Previous / "Page X of Y" / Next, using `hx-get`, `hx-target`, `hx-push-url` and scroll-to-top, with plain `href`s as a fallback) is ready for Saved Books to reuse. The results summary now shows a range ("Showing 41–60 of 1,234"), and a page past the last result links back to page 1. The search form still submits as a full page load; only paging uses HTMX. 13 new tests were added and the Phase 3 tests were updated for the new client arguments and summary text. 120 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the recommendation to skip TDD. Keeping the search form as a full page load, and adding the past-the-last-page message, were the agent's calls. No follow-up questions.
+- **Sideways:** Nothing went wrong. Ruff reformatted one line in `books/views.py`.
+
 ## 2026-11-16 — Implemented Phase 3: Open Library client and basic Search Catalog
 
 ### Prompts

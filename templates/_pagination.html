@@ -1,0 +1,27 @@
+{% comment %}
+Shared Previous / "Page X of Y" / Next pagination (Shelf grid convention).
+
+Include with:
+  page, num_pages   current page and page count
+  prev_url, next_url   full URLs, or empty when there's no such page
+  target   CSS selector of the area HTMX swaps; the URL is pushed to history
+
+Without JavaScript the links still work as normal page loads.
+{% endcomment %}
+{% if num_pages > 1 %}
+<nav class="flex justify-center mt-6" aria-label="Pagination">
+  <div class="join" hx-target="{{ target }}" hx-swap="innerHTML show:{{ target }}:top" hx-push-url="true">
+    {% if prev_url %}
+      <a href="{{ prev_url }}" hx-get="{{ prev_url }}" class="join-item btn" rel="prev" data-testid="prev-page">« Previous</a>
+    {% else %}
+      <button type="button" class="join-item btn" disabled>« Previous</button>
+    {% endif %}
+    <span class="join-item btn btn-ghost pointer-events-none" aria-current="page" data-testid="page-status">Page {{ page }} of {{ num_pages }}</span>
+    {% if next_url %}
+      <a href="{{ next_url }}" hx-get="{{ next_url }}" class="join-item btn" rel="next" data-testid="next-page">Next »</a>
+    {% else %}
+      <button type="button" class="join-item btn" disabled>Next »</button>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}
