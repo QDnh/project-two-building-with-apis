@@ -6,7 +6,7 @@ import urllib.request
 import pytest
 import requests
 
-import openlibrary_search as ols
+from books import openlibrary
 
 
 def test_unfaked_requests_call_fails_the_test():
@@ -28,4 +28,4 @@ def test_open_library_client_cannot_hide_the_failure_as_a_search_error():
     # The client turns network errors into SearchError. The guard must not be
     # swallowed that way, or a test could pass while hitting the real API.
     with pytest.raises(pytest.fail.Exception):
-        ols.search_books("dune")
+        openlibrary.search_books("dune")

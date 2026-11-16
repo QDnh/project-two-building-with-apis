@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Search Catalog{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold">Search Catalog</h1>
+<p class="text-base-content/70 mt-1">Find books on Open Library by title, author, keywords or ISBN.</p>
+
+<div class="card bg-base-100 shadow-sm border border-base-300 mt-4">
+  <div class="card-body p-4">
+    <form method="get" action="{% url 'books:search_catalog' %}" role="search" class="flex flex-col sm:flex-row gap-2">
+      <label class="input w-full">
+        <span class="sr-only">Search Open Library</span>
+        <input type="search" name="q" value="{{ query }}" placeholder="e.g. Dune, Ursula K. Le Guin, 978-0-441-01359-3"
+               class="grow" autofocus>
+      </label>
+      <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+    {% if form_error %}
+      <p class="text-error text-sm" data-testid="form-error">{{ form_error }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div id="search-results" class="mt-4">
+  {% include "books/_search_results.html" %}
+</div>
+{% endblock %}

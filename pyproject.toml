@@ -19,9 +19,8 @@ dev = [
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
-# "." lets tests import the Django project; "scripts" lets them
-# `import openlibrary_search` until it moves into the books app (Phase 3).
-pythonpath = [".", "scripts"]
+# "." lets tests import the Django project.
+pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.ruff]
@@ -37,4 +36,4 @@ select = ["E", "F", "I", "B", "UP", "DJ"]
 "config/settings.py" = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["accounts", "books", "config", "openlibrary_search"]
+known-first-party = ["accounts", "books", "config"]

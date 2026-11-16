@@ -1,0 +1,38 @@
+{# The Search Catalog results area: an Open Library error, the results grid, or nothing yet. #}
+{% load humanize %}
+{% if search_error %}
+  <div role="alert" class="alert alert-error alert-soft items-start" data-testid="search-error">
+    <span aria-hidden="true">⚠️</span>
+    <div>
+      <p class="font-semibold">{{ search_error }}</p>
+      <p class="text-sm">Your saved books are still available: <a href="{% url 'books:saved_books' %}" class="link">go to Saved Books</a>.</p>
+    </div>
+  </div>
+{% elif search_page %}
+  {% if search_page.results %}
+    <p class="text-sm text-base-content/70">
+      Showing {{ search_page.results|length }} of {{ search_page.total|intcomma }} match{{ search_page.total|pluralize:"es" }} for “{{ query }}”
+    </p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
+      {% for book in search_page.results %}
+        <div class="card bg-base-100 shadow-sm border border-base-300" data-testid="search-result">
+          <figure class="aspect-[2/3] rounded-t-box overflow-hidden">
+            {% include "books/_cover.html" %}
+          </figure>
+          <div class="card-body p-3 gap-1">
+            <h2 class="font-semibold leading-tight">{{ book.title }}</h2>
+            <p class="text-xs text-base-content/70">
+              {{ book.author_list|join:", "|default:"Unknown author" }} · {{ book.first_publish_year|default:"Year unknown" }}
+            </p>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body">
+        <p>No books found matching “{{ query }}”. Try different words or check the spelling.</p>
+      </div>
+    </div>
+  {% endif %}
+{% endif %}

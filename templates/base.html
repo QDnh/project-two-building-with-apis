@@ -14,11 +14,13 @@
     </div>
     {% if user.is_authenticated %}
       <ul class="menu menu-horizontal px-1 hidden sm:flex">
+        <li><a href="{% url 'books:search_catalog' %}" class="{% if request.resolver_match.view_name == 'books:search_catalog' %}menu-active{% endif %}">Search Catalog</a></li>
         <li><a href="{% url 'books:saved_books' %}" class="{% if request.resolver_match.view_name == 'books:saved_books' %}menu-active{% endif %}">Saved Books</a></li>
       </ul>
       <div class="dropdown dropdown-end">
         <div tabindex="0" role="button" class="btn btn-ghost btn-sm" data-testid="user-menu">{{ user.username }} ▾</div>
         <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box w-max min-w-28 shadow z-10 mt-1">
+          <li class="sm:hidden"><a href="{% url 'books:search_catalog' %}">Search Catalog</a></li>
           <li class="sm:hidden"><a href="{% url 'books:saved_books' %}">Saved Books</a></li>
           {# The button is the menu item itself, so the whole row is clickable. #}
           <li><button type="submit" form="logout-form">Sign out</button></li>

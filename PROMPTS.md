@@ -28,6 +28,19 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 3: Open Library client and basic Search Catalog
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 3`
+2. (Answer to "run the /tdd skill?") Skip TDD (Recommended)
+3. Looks good and works.
+4. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit and push.
+
+### Summary
+- **Outcome:** Built Phase 3. The script's search and error handling moved into `books/openlibrary.py`, which requests the eight needed fields, takes `page`/`limit`, sends a User-Agent with `OPENLIBRARY_CONTACT_EMAIL` from settings when set, parses results into `SearchResult` objects (ISBNs and subjects capped at 10), and raises one `SearchError` with a user-facing message while keeping the technical cause for logging. `clean_query()` strips hyphens and spaces from ISBN-like input. `/catalog/` (`SearchCatalogView`, signed in only) shows a search form and a Shelf-grid card grid (cover, title, authors, year) with a match count and a no-results message; empty queries show a message and never call the client; failures show an inline DaisyUI alert linking to Saved Books and are logged on the server. Search Catalog links were added to the navbar and home page, and `django.contrib.humanize` was enabled for the match count. The old `scripts/openlibrary_search.py` and its tests were removed; its search and error tests carry over to `tests/test_openlibrary_client.py`, and `tests/test_search_catalog.py` covers the page. A one-time manual check against the live API (generic User-Agent, no email) confirmed the fields come back, a bare ISBN in `q` finds the right work, and a `key:` query returns exactly one work; this is noted in the client's docstring. 103 tests pass; `ruff check` and `ruff format --check` are clean.
+- **Deviations:** The user accepted the recommendation to skip TDD. Deleting the standalone script, rather than keeping it as a thin wrapper, was the agent's call; it was explained in the wrap-up, and the command-line-only tests for `main()` and `format_book()` were dropped. No follow-up questions.
+- **Sideways:** The first test run had 3 failures because the expected error messages contained parentheses that `pytest.raises(match=...)` read as regex groups; fixed with `re.escape`.
+
 ## 2026-11-16 — Implemented Phase 2: book models, book page and demo data
 
 ### Prompts

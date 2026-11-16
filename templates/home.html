@@ -7,7 +7,8 @@
       <h1 class="text-3xl font-bold">Your personal reading list</h1>
       <p class="py-4">Find books on Open Library, save them, rate them, and choose which ones to share with friends.</p>
       {% if user.is_authenticated %}
-        <a href="{% url 'books:saved_books' %}" class="btn btn-primary">Go to Saved Books</a>
+        <a href="{% url 'books:search_catalog' %}" class="btn btn-primary">Search Catalog</a>
+        <a href="{% url 'books:saved_books' %}" class="btn btn-ghost">Go to Saved Books</a>
       {% else %}
         <a href="{% url 'signup' %}" class="btn btn-primary">Create an account</a>
         <a href="{% url 'login' %}" class="btn btn-ghost">Sign in</a>
