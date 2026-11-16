@@ -28,6 +28,30 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Implemented Phase 10: The app's API
+
+### Prompts
+1. `/implement @prd/book-catalog-system.md @plans/book-catalog-system.md implement Phase 10`
+2. (Answer to "run the /tdd skill?") Yes, run /tdd (Recommended)
+3. Yes, do it. Blitz through them. Check they are red, make them green, and pause after each to give me details.
+4. yes, go on to behaviour 2
+5. yes, keep 503, go on to behaviour 3
+6. I need further explanation. Which URL do I click and how do I use things like the PATCH form?
+7. Continue
+8. (Answers to "append PROMPTS.md?" and "commit and push?") Yes, append. Yes, commit as "Implement Phase 10" and push.
+
+### Summary
+- **Outcome:** Built Phase 10 with Django REST Framework (`djangorestframework` 3.18.3, plus `rest_framework.authtoken`). API calls use token then session authentication and require sign-in by default, so anonymous calls to members-only endpoints get 401. New files are `books/api.py`, `books/serializers.py`, `books/api_urls.py` and `tests/test_api.py`. Endpoints:
+  - `/api/token/` exchanges a username and password for a token.
+  - `/api/saved-books/` is a viewset scoped to `user=request.user` with list, create, retrieve, PATCH and delete; PUT returns 405. Create takes only `work_id` and goes through `services.save_book`. Duplicates and malformed IDs get 400, and an Open Library `SearchError` gets 503 and is logged. PATCH goes through `services.update_saved_book`, with `InvalidUpdate` turned into per-field 400 errors.
+  - `/api/users/<username>/saved-books/` lists public saves through `SavedBook.objects.public()`.
+  - `/api/books/<work_id>/` returns book details plus `community_average` (a one-decimal string or null) and `rating_count`, with no user fields.
+  - `/api/auth/` gives the browsable API its sign-in and sign-out links.
+
+  Authors are returned as a list everywhere. The three TDD behaviours were: another user's save returns 404 with the same body as a missing save (for retrieve, update and delete); a new work ID while Open Library is down returns 503 while a stored book still saves; and the book endpoint has an exact set of keys with no user data. `update_saved_book` also now rejects a non-boolean, non-string `is_public`, which a JSON `[]` had crashed with a 500. 289 tests pass; `ruff check`, `ruff format --check` and `manage.py check` are clean, and the dev database was migrated for the token table.
+- **Deviations:** The user accepted the TDD recommendation and the three proposed behaviours without changes, and asked to go straight from red to green, pausing after each GREEN. After cycle 2, the user chose to keep 503 (not 400) when Open Library has no work with the ID, matching the website. They asked a follow-up during manual verification: which URL to open and how to use the browsable API's PATCH form. That got a step-by-step walkthrough using real save IDs from the dev database.
+- **Sideways:** Cycle 2's first run wasn't a valid red: the `SearchError` escaped the test client instead of failing an assertion. The shared test client was changed to `raise_request_exception=False`, and the test then failed properly with 500 ≠ 503. A large Python-in-heredoc edit failed to parse in bash; nothing was applied (checked with `git status`), and the files were written with Write and Edit instead. The first manual-verification steps wrongly said to "click one save's URL" and assumed the POST form showed only `work_id`. Checking the rendered browsable API showed the list has no per-save links (you type `/api/saved-books/<id>/`), the create form does show only `work_id`, and the detail page has only a raw-content PATCH box pre-filled with the whole save. The walkthrough was corrected to match. A shell script piped into `manage.py shell` hung in interactive mode and then hit `DisallowedHost` for `testserver`; it was rerun with `shell -c` and `HTTP_HOST="localhost"`.
+
 ## 2026-11-16 — Implemented Phase 9: Book page owner controls and public profile
 
 ### Prompts

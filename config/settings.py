@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     # Third-party
     "django_htmx",
+    "rest_framework",
+    "rest_framework.authtoken",
     "django_tailwind_cli",
     # Project apps
     "accounts",
@@ -115,6 +117,24 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+
+# Django REST Framework (the app's API)
+
+# Session auth lets signed-in website users use the browsable API; token auth
+# is for scripts and tools. Token auth comes first so an unauthenticated call
+# gets 401 (with a WWW-Authenticate header) rather than 403. Tokens don't expire.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+}
 
 
 # Internationalization

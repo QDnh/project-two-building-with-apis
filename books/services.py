@@ -96,7 +96,10 @@ def update_saved_book(save, data):
             errors["rating"] = "Rating must be a whole number of stars from 1 to 5."
     if "is_public" in data:
         value = data["is_public"]
-        if value in TRUE_VALUES or value in FALSE_VALUES:
+        # Only booleans and strings: a JSON list or object isn't hashable.
+        if isinstance(value, bool | str) and (
+            value in TRUE_VALUES or value in FALSE_VALUES
+        ):
             changes["is_public"] = value in TRUE_VALUES
         else:
             errors["is_public"] = "Choose public or private."

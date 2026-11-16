@@ -9,5 +9,8 @@ urlpatterns = [
     path("", TemplateView.as_view(template_name="home.html"), name="home"),
     path("accounts/", include("accounts.urls")),
     path("", include("books.urls")),
+    path("api/", include("books.api_urls")),
+    # Sign in / out links on the browsable API.
+    path("api/auth/", include("rest_framework.urls")),
     path("admin/", admin.site.urls),
 ]
