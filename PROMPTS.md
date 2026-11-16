@@ -28,6 +28,28 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Walkthrough of how the Saved Books page searches and displays data
+
+### Prompts
+1. Walk me through how the saved-books page searches and displays data. Start with the browser controls, then trace the request, view, queryset, Q objects, filters, sorting, pagination, and template. Show the relevant files and explain one part at a time. Identify whether the data comes from our database or an external API. Explain the existing code without changing it.
+2. append a session log to PROMPTS.md at the repo root, under today's date, newest entry at the top (line 31); record every prompt the user gave you this session, in order, including any corrections; end the entry with a short summary: the outcome, any places where the user deviated from a recommended answer or asked follow-up questions, and anything that went sideways.
+
+### Summary
+- **Outcome:** Explanation only; no code changed. The walkthrough went through the files in order:
+  - `templates/books/saved_books.html`: the GET toolbar form and its HTMX triggers.
+  - `books/urls.py`: the `saved/` route.
+  - `SavedBooksView` and `HtmxPartialMixin` in `books/views.py`.
+  - `services.filter_saved_books` in `books/services.py`:
+    - an OR search over title and authors built from `Q(...) | Q(...)`;
+    - status, rating and visibility filters checked against allow-lists;
+    - the `SAVED_BOOK_SORTS` table, which uses `Lower`, `F(...).nulls_last` and a `-pk` tiebreaker.
+  - `Paginator`/`get_page` with 12 saves per page, and how the `HX-Push-Url` header is built.
+  - The `_saved_books_list.html` and `_pagination.html` templates.
+
+  The walkthrough confirmed that the page's data comes only from the local SQLite database (`SavedBook` joined to `Book`). Open Library is called only when a book is first saved, never when this page is viewed. The only file changed this session is this log entry.
+- **Deviations:** None. There was no recommendation to accept or override, and no follow-up questions about the walkthrough.
+- **Sideways:** Nothing went wrong.
+
 ## 2026-11-16 — Implemented Phase 11: Prune command and README
 
 ### Prompts
