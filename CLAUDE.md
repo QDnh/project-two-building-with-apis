@@ -18,6 +18,7 @@ A Django web app and REST API where users search Open Library, save books to a p
 - Tests: `uv run pytest` (the full suite takes about 3 minutes, longer than the default 2-minute command timeout). While working, run only the relevant files (`uv run pytest tests/test_<area>.py`); run the full suite only when it's needed, such as once at the end of a phase before committing.
 - Lint and format: `uv run ruff check .` and `uv run ruff format --check .`
 - Demo data (DEBUG only, no network): `uv run python manage.py seed_demo`
+- Remove books nobody has saved: `uv run python manage.py prune_books` (`--dry-run` lists them first)
 
 ## Conventions
 
