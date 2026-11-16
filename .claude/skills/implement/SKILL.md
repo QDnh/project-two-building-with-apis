@@ -16,7 +16,8 @@ Implement only that phase. Do not begin the next one.
 
 ## 2. Implement the Phase
 
-Ask the user whether to run the /tdd skill.
+Ask the user whether to run the /tdd skill; 
+give your recommendation regarding if you think it is necessary.
 If yes, run the /tdd skill before starting implementation of the specified phase.
 If no, skip the /tdd skill and move on to implementing the specified phase. 
 
