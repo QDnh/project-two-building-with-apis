@@ -28,6 +28,18 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-16 — Broke the Book Catalog System PRD into an 11-phase implementation plan
+
+### Prompts
+1. `/prd-to-plan`
+2. Merge 9 and 10. Merge 11 and 12. Early demo data is fine, I think. Token endpoint path is probably fine.
+3. append a session log to PROMPTS.md at the repo root, under today's date, newest entry at the top (line 31); record every prompt the user gave you this session, in order, including any corrections; end the entry with a short summary: the outcome, any places where the user deviated from a recommended answer or asked follow-up questions, and anything that went sideways.
+
+### Summary
+- **Outcome:** The PRD wasn't in the conversation, so the agent read `prd/book-catalog-system.md`, the prototypes README and the existing Open Library script. URL paths came from the privacy prototype. The agent proposed 13 tracer-bullet phases, then wrote `plans/book-catalog-system.md` with 11 phases after the merges. The plan header records the durable decisions: the `accounts`/`books` apps, the User/Book/SavedBook models, website and API URLs, authentication, the one public-saves query, and the faking layers for tests. The plan file isn't committed yet.
+- **Deviations:** The agent suggested three possible merges (3+4, 9+10, 11+12) and said it leaned toward keeping the rest separate. The user merged 9+10 (book page owner controls + public profile) and 11+12 (API CRUD + public API) but kept the search phases 3 and 4 separate. The user accepted putting demo data early (phase 2) and the proposed `/api/token/` path, which the PRD left unspecified.
+- **Sideways:** Nothing major. The skill expected the PRD to already be in context, but the agent found it in the repo instead of asking for it.
+
 ## 2026-11-16 — Grilled the Book Catalog System design, prototyped the UI and privacy rules, wrote the PRD
 
 ### Prompts
