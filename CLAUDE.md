@@ -35,7 +35,7 @@ A Django web app and REST API where users search Open Library, save books to a p
 - Store book data locally so saved books stay usable when Open Library is unavailable.
 - Book details come only from Open Library, never from data sent by clients.
 - The website and the API share the same logic and enforce the same privacy rules, defined in one place.
-- Shared website/API logic lives in `books/services.py`; saving a book goes only through `services.save_book(user, work_id)`.
+- Shared website/API logic lives in `books/services.py`; saving a book goes only through `services.save_book(user, work_id)`, and editing a save only through `services.update_saved_book(save, data)` (validates every field before saving anything; raises `InvalidUpdate`).
 - Open Library is the only external API.
 - All Open Library calls go through `books/openlibrary.py`; it raises `SearchError` with a user-facing message. Client tests fake `requests.get`; view and API tests fake the client's functions.
 - Tests must never call the real Open Library.
